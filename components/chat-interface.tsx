@@ -59,6 +59,10 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
         },
         (error) => {
           console.error("Error getting location:", error)
+          // Even if there's an error, we should set locationEnabled to true
+          // since the browser allowed the permission request
+          setLocationEnabled(true)
+          setLocationActive(false)
         },
       )
     }
@@ -72,6 +76,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     try {
       await disableLocation({ userId })
       setLocationActive(false)
+      // Keep locationEnabled true since the permission is still granted
+      setLocationEnabled(true)
       setShowNearbyUsers(false)
     } catch (error) {
       console.error("Error disabling location:", error)
@@ -160,29 +166,47 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               </div>
             )}
 
-            {locationActive && !showSearch && !showNearbyUsers && (
-              <div className="mt-2 p-2 bg-green-50 rounded-md text-sm">
-                <div className="flex items-center text-green-700 mb-1">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  <span>Location is active - others can find you</span>
-                </div>
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleDisableLocation}>
-                  <MapPinOff className="h-3 w-3 mr-1" />
-                  Disable Location
-                </Button>
-              </div>
-            )}
+            {/* Location status indicators */}
+            {!showSearch && !showNearbyUsers && (
+              <>
+                {locationActive && (
+                  <div className="mt-2 p-2 bg-green-50 rounded-md text-sm">
+                    <div className="flex items-center text-green-700 mb-1">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <span>Location is active - others can find you</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleDisableLocation}>
+                      <MapPinOff className="h-3 w-3 mr-1" />
+                      Disable Location
+                    </Button>
+                  </div>
+                )}
 
-            {!locationEnabled && !locationActive && !showSearch && !showNearbyUsers && (
-              <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
-                <div className="flex items-center text-yellow-700 mb-1">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  <span>Location is disabled</span>
-                </div>
-                <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleEnableLocation}>
-                  Enable Location
-                </Button>
-              </div>
+                {locationEnabled && !locationActive && (
+                  <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
+                    <div className="flex items-center text-yellow-700 mb-1">
+                      <MapPinOff className="h-4 w-4 mr-1" />
+                      <span>Location is disabled - you're not discoverable</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleEnableLocation}>
+                      <MapPin className="h-3 w-3 mr-1" />
+                      Enable Location
+                    </Button>
+                  </div>
+                )}
+
+                {!locationEnabled && (
+                  <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
+                    <div className="flex items-center text-yellow-700 mb-1">
+                      <MapPin className="h-4 w-4 mr-1" />
+                      <span>Location permission needed</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleEnableLocation}>
+                      Enable Location
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
