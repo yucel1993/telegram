@@ -192,7 +192,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
 
   // Always show the chat UI, even if there are no messages yet
   return (
-    <>
+    <div className="flex flex-col h-full">
       {/* Chat header */}
       <div className="p-4 border-b border-gray-200 bg-white">
         <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
@@ -244,7 +244,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
       </div>
 
       {/* Message input - always show this, even for new chats */}
-      <div className="p-4 border-t border-gray-200 bg-white">
+      <div className="p-4 border-t border-gray-200 bg-white mt-auto">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <Input
             ref={inputRef}
@@ -267,6 +267,6 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
           </Button>
         </form>
       </div>
-    </>
+    </div>
   )
 }

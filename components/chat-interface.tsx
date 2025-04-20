@@ -218,7 +218,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
 
       {/* Right chat area */}
       {showChatArea && (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col h-full">
           {selectedChat ? (
             <>
               {isMobile && (
@@ -229,7 +229,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                   </Button>
                 </div>
               )}
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col h-full">
                 <ChatArea userId={userId} chatId={selectedChat} />
               </div>
             </>
