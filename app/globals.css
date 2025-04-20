@@ -99,12 +99,22 @@ body {
     overflow: hidden;
     height: 100%;
     width: 100%;
-    position: fixed;
   }
 
   input,
   textarea {
     font-size: 16px !important; /* Prevents iOS zoom on input focus */
+  }
+
+  /* Fix for iOS keyboard issues */
+  .flex-1 {
+    min-height: 0;
+  }
+
+  /* Ensure the chat container doesn't get pushed up by keyboard */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 120px); /* Adjust based on your header/footer height */
   }
 }
 

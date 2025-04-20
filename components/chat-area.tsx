@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send } from "lucide-react"
+import { Send, ArrowDown } from "lucide-react"
 import { getChatMessages, sendMessage, markMessagesAsRead } from "@/app/actions/chats"
 
 interface ChatAreaProps {
@@ -19,9 +19,13 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   const [messageText, setMessageText] = useState("")
   const [otherUser, setOtherUser] = useState<any>(null)
   const [sending, setSending] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const [showScrollButton, setShowScrollButton] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const lastMessageCountRef = useRef(0)
 
   useEffect(() => {
     async function fetchMessages() {
@@ -29,7 +33,18 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         const data = await getChatMessages({ userId, chatId })
 
         if (data.messages && Array.isArray(data.messages)) {
+          // Only auto-scroll if new messages have been added
+          const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
+
           setMessages(data.messages)
+          lastMessageCountRef.current = data.messages.length
+
+          // If we should auto-scroll, do it after the state update
+          if (shouldAutoScroll) {
+            setTimeout(() => {
+              scrollToBottom(false)
+            }, 100)
+          }
         }
 
         setOtherUser(data.otherUser)
@@ -56,12 +71,51 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [userId, chatId])
+  }, [userId, chatId, autoScroll])
 
+  // Handle scroll events to detect when user manually scrolls
   useEffect(() => {
-    // Scroll to bottom when messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    const container = messagesContainerRef.current
+
+    if (!container) return
+
+    const handleScroll = () => {
+      // If the user scrolls up, disable auto-scroll
+      if (container.scrollTop < container.scrollHeight - container.clientHeight - 100) {
+        setAutoScroll(false)
+        setShowScrollButton(true)
+      } else {
+        // If the user scrolls to the bottom, enable auto-scroll again
+        setAutoScroll(true)
+        setShowScrollButton(false)
+      }
+    }
+
+    container.addEventListener("scroll", handleScroll)
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
+  // Function to scroll to bottom
+  const scrollToBottom = (enableAutoScroll = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+
+    if (enableAutoScroll) {
+      setAutoScroll(true)
+      setShowScrollButton(false)
+    }
+  }
+
+  // When adding a new message, scroll to bottom
+  useEffect(() => {
+    if (sending && autoScroll) {
+      scrollToBottom(false)
+    }
+  }, [messages, sending, autoScroll])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,6 +138,14 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
 
+      // Enable auto-scroll when sending a message
+      setAutoScroll(true)
+
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        scrollToBottom(false)
+      }, 100)
+
       // Focus the input field after sending
       setTimeout(() => {
         inputRef.current?.focus()
@@ -105,6 +167,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         const data = await getChatMessages({ userId, chatId })
         if (data.messages && Array.isArray(data.messages)) {
           setMessages(data.messages)
+          lastMessageCountRef.current = data.messages.length
         }
       }
     } catch (error) {
@@ -130,7 +193,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 bg-gray-50 relative">
         <div className="space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
@@ -161,6 +224,17 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
           )}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <Button
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-4 right-4 rounded-full w-10 h-10 p-0 shadow-md"
+            size="icon"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Message input */}
@@ -173,6 +247,14 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
             placeholder="Type a message..."
             className="flex-1"
             disabled={sending}
+            onFocus={() => {
+              // On mobile, wait a bit for the keyboard to appear, then scroll
+              setTimeout(() => {
+                if (inputRef.current) {
+                  inputRef.current.scrollIntoView({ behavior: "smooth" })
+                }
+              }, 300)
+            }}
           />
           <Button type="submit" disabled={!messageText.trim() || sending}>
             <Send className="h-4 w-4" />

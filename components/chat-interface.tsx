@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, Users, ArrowLeft } from "lucide-react"
+import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff } from "lucide-react"
 import { logout } from "@/app/actions/auth"
-import { updateUserLocation, getNearbyUsers } from "@/app/actions/users"
+import { updateUserLocation, getNearbyUsers, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
 import ChatArea from "@/components/chat-area"
 import UserSearch from "@/components/user-search"
@@ -22,6 +22,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [showNearbyUsers, setShowNearbyUsers] = useState(false)
   const [nearbyUsers, setNearbyUsers] = useState([])
   const [locationEnabled, setLocationEnabled] = useState(false)
+  const [locationActive, setLocationActive] = useState(false)
   const router = useRouter()
   const isMobile = useMobile()
 
@@ -30,12 +31,12 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     navigator.permissions.query({ name: "geolocation" }).then((result) => {
       if (result.state === "granted") {
         setLocationEnabled(true)
-        updateLocation()
+        // Don't automatically update location, wait for user to enable it
       }
     })
   }, [])
 
-  const updateLocation = () => {
+  const updateLocation = async () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -46,6 +47,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
             longitude,
           })
           setLocationEnabled(true)
+          setLocationActive(true)
         },
         (error) => {
           console.error("Error getting location:", error)
@@ -58,8 +60,23 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     updateLocation()
   }
 
+  const handleDisableLocation = async () => {
+    try {
+      await disableLocation({ userId })
+      setLocationActive(false)
+      setShowNearbyUsers(false)
+    } catch (error) {
+      console.error("Error disabling location:", error)
+    }
+  }
+
   const handleFindNearbyUsers = async () => {
     if (locationEnabled) {
+      // If location is not active, enable it first
+      if (!locationActive) {
+        await updateLocation()
+      }
+
       const users = await getNearbyUsers({ userId, distance: 1000 })
       setNearbyUsers(users)
       setShowNearbyUsers(true)
@@ -88,6 +105,11 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setSelectedChat(null)
   }
 
+  const handleBackToChats = () => {
+    setShowNearbyUsers(false)
+    setShowSearch(false)
+  }
+
   // Determine what to show based on mobile/desktop and selected state
   const showSidebar = !isMobile || (isMobile && !selectedChat)
   const showChatArea = !isMobile || (isMobile && selectedChat)
@@ -104,17 +126,46 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" className="flex-1" onClick={handleSearchClick}>
-                <Search className="h-4 w-4 mr-2" />
-                Search
+
+            {(showSearch || showNearbyUsers) && (
+              <Button variant="outline" size="sm" onClick={handleBackToChats} className="mb-2 w-full">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Chats
               </Button>
-              <Button variant="outline" className="flex-1" onClick={handleFindNearbyUsers} disabled={!locationEnabled}>
-                <Users className="h-4 w-4 mr-2" />
-                Nearby
-              </Button>
-            </div>
-            {!locationEnabled && (
+            )}
+
+            {!showSearch && !showNearbyUsers && (
+              <div className="flex space-x-2">
+                <Button variant="outline" className="flex-1" onClick={handleSearchClick}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleFindNearbyUsers}
+                  disabled={!locationEnabled}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Nearby
+                </Button>
+              </div>
+            )}
+
+            {locationActive && !showSearch && !showNearbyUsers && (
+              <div className="mt-2 p-2 bg-green-50 rounded-md text-sm">
+                <div className="flex items-center text-green-700 mb-1">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  <span>Location is active - others can find you</span>
+                </div>
+                <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleDisableLocation}>
+                  <MapPinOff className="h-3 w-3 mr-1" />
+                  Disable Location
+                </Button>
+              </div>
+            )}
+
+            {!locationEnabled && !locationActive && !showSearch && !showNearbyUsers && (
               <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
                 <div className="flex items-center text-yellow-700 mb-1">
                   <MapPin className="h-4 w-4 mr-1" />

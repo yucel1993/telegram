@@ -32,6 +32,25 @@ export async function updateUserLocation({
   }
 }
 
+export async function disableLocation({ userId }: { userId: string }) {
+  try {
+    await connectToDatabase()
+
+    await User.findByIdAndUpdate(userId, {
+      location: {
+        type: "Point",
+        coordinates: [0, 0], // Reset coordinates to 0,0
+        lastUpdated: null,
+      },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error disabling location:", error)
+    return { success: false, error: "Failed to disable location" }
+  }
+}
+
 export async function getNearbyUsers({
   userId,
   distance = 1000,
@@ -65,6 +84,9 @@ export async function getNearbyUsers({
       {
         $match: {
           _id: { $ne: new mongoose.Types.ObjectId(userId) },
+          // Only include users with valid locations (not 0,0)
+          "location.coordinates.0": { $ne: 0 },
+          "location.coordinates.1": { $ne: 0 },
         },
       },
       {
