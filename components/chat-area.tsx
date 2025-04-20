@@ -21,6 +21,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   const [sending, setSending] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [chatInitialized, setChatInitialized] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -48,6 +49,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         }
 
         setOtherUser(data.otherUser)
+        setChatInitialized(true)
 
         // Mark messages as read
         if (data.messages && data.messages.some((m: any) => !m.read && m.sender !== userId)) {
@@ -55,6 +57,9 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         }
       } catch (error) {
         console.error("Error fetching messages:", error)
+        // Even if there's an error, we should still set chatInitialized to true
+        // so the UI doesn't get stuck in a loading state
+        setChatInitialized(true)
       } finally {
         setLoading(false)
       }
@@ -185,11 +190,12 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
     )
   }
 
+  // Always show the chat UI, even if there are no messages yet
   return (
     <>
       {/* Chat header */}
       <div className="p-4 border-b border-gray-200 bg-white">
-        <h3 className="font-medium">{otherUser?.username || "Chat"}</h3>
+        <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
       </div>
 
       {/* Messages area */}
@@ -237,7 +243,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         )}
       </div>
 
-      {/* Message input */}
+      {/* Message input - always show this, even for new chats */}
       <div className="p-4 border-t border-gray-200 bg-white">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <Input

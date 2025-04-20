@@ -17,6 +17,7 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [creatingChat, setCreatingChat] = useState<Record<string, boolean>>({})
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,6 +42,8 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
 
   const handleStartChat = async (otherUserId: string) => {
     try {
+      setCreatingChat((prev) => ({ ...prev, [otherUserId]: true }))
+
       const chatId = await createChat({
         userId,
         otherUserId,
@@ -48,9 +51,13 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
 
       if (chatId) {
         onSelectUser(chatId)
+      } else {
+        console.error("Failed to create chat - no chat ID returned")
       }
     } catch (error) {
       console.error("Error creating chat:", error)
+    } finally {
+      setCreatingChat((prev) => ({ ...prev, [otherUserId]: false }))
     }
   }
 
@@ -87,9 +94,14 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
                       : "Never active"}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleStartChat(user._id)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleStartChat(user._id)}
+                  disabled={creatingChat[user._id]}
+                >
                   <UserPlus className="h-4 w-4 mr-1" />
-                  Chat
+                  {creatingChat[user._id] ? "Opening..." : "Chat"}
                 </Button>
               </div>
             ))}

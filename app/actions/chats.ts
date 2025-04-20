@@ -48,10 +48,44 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
   try {
     await connectToDatabase()
 
+    // Check if this is a user ID rather than a chat ID (for nearby users)
+    if (chatId.length === 24 && /^[0-9a-fA-F]{24}$/.test(chatId)) {
+      try {
+        // Check if it's a valid chat ID first
+        const existingChat = await Chat.findById(chatId)
+
+        if (!existingChat) {
+          // It might be a user ID, let's check if a chat exists with these participants
+          const existingChatWithUser = await Chat.findOne({
+            participants: {
+              $all: [new mongoose.Types.ObjectId(userId), new mongoose.Types.ObjectId(chatId)],
+            },
+          })
+
+          if (existingChatWithUser) {
+            // Use the existing chat
+            chatId = existingChatWithUser._id.toString()
+          } else {
+            // Create a new chat with these participants
+            const newChat = new Chat({
+              participants: [userId, chatId],
+              messages: [],
+            })
+
+            await newChat.save()
+            chatId = newChat._id.toString()
+          }
+        }
+      } catch (error) {
+        console.error("Error checking chat:", error)
+      }
+    }
+
     const chat = await Chat.findById(chatId)
 
     if (!chat) {
-      throw new Error("Chat not found")
+      // If chat still doesn't exist, return empty data
+      return { messages: [], otherUser: null }
     }
 
     // Find the other user in the chat
@@ -145,6 +179,33 @@ export async function sendMessage({
 export async function markMessagesAsRead({ userId, chatId }: { userId: string; chatId: string }) {
   try {
     await connectToDatabase()
+
+    // Check if this is a user ID rather than a chat ID
+    if (chatId.length === 24 && /^[0-9a-fA-F]{24}$/.test(chatId)) {
+      try {
+        // Check if it's a valid chat ID first
+        const existingChat = await Chat.findById(chatId)
+
+        if (!existingChat) {
+          // It might be a user ID, let's check if a chat exists with these participants
+          const existingChatWithUser = await Chat.findOne({
+            participants: {
+              $all: [new mongoose.Types.ObjectId(userId), new mongoose.Types.ObjectId(chatId)],
+            },
+          })
+
+          if (existingChatWithUser) {
+            // Use the existing chat
+            chatId = existingChatWithUser._id.toString()
+          } else {
+            // No chat exists yet, nothing to mark as read
+            return { success: true }
+          }
+        }
+      } catch (error) {
+        console.error("Error checking chat:", error)
+      }
+    }
 
     await Chat.updateOne(
       { _id: chatId },

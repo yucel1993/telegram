@@ -11,6 +11,14 @@ import ChatArea from "@/components/chat-area"
 import UserSearch from "@/components/user-search"
 import { useMobile } from "@/hooks/use-mobile"
 
+// Define the NearbyUser interface
+interface NearbyUser {
+  _id: string
+  username: string
+  distance: number
+  lastActive?: Date
+}
+
 interface ChatInterfaceProps {
   userId: string
   username: string
@@ -20,7 +28,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [showNearbyUsers, setShowNearbyUsers] = useState(false)
-  const [nearbyUsers, setNearbyUsers] = useState([])
+  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]) // Properly typed state
   const [locationEnabled, setLocationEnabled] = useState(false)
   const [locationActive, setLocationActive] = useState(false)
   const router = useRouter()
@@ -78,7 +86,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
       }
 
       const users = await getNearbyUsers({ userId, distance: 1000 })
-      setNearbyUsers(users)
+      setNearbyUsers(users as NearbyUser[]) // Type assertion to fix the error
       setShowNearbyUsers(true)
       setShowSearch(false)
     }
@@ -96,11 +104,6 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setShowNearbyUsers(false)
   }
 
-  const handleSearchClick = () => {
-    setShowSearch(true)
-    setShowNearbyUsers(false)
-  }
-
   const handleBackClick = () => {
     setSelectedChat(null)
   }
@@ -108,6 +111,11 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const handleBackToChats = () => {
     setShowNearbyUsers(false)
     setShowSearch(false)
+  }
+
+  const handleSearchClick = () => {
+    setShowSearch(true)
+    setShowNearbyUsers(false)
   }
 
   // Determine what to show based on mobile/desktop and selected state
@@ -186,7 +194,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                 <h3 className="font-medium mb-2">Nearby Users (1000m)</h3>
                 {nearbyUsers.length > 0 ? (
                   <div className="space-y-2">
-                    {nearbyUsers.map((user: any) => (
+                    {nearbyUsers.map((user) => (
                       <div
                         key={user._id}
                         className="p-3 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100"
