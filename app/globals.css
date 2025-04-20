@@ -92,3 +92,28 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    position: fixed;
+  }
+
+  input,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on input focus */
+  }
+}
+
+/* Ensure message content doesn't overflow */
+.break-words {
+  word-break: break-word;
+}
+
+/* Improve scrolling on mobile */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}

@@ -18,18 +18,24 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   const [loading, setLoading] = useState(true)
   const [messageText, setMessageText] = useState("")
   const [otherUser, setOtherUser] = useState<any>(null)
+  const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function fetchMessages() {
       try {
         const data = await getChatMessages({ userId, chatId })
-        setMessages(data.messages)
+
+        if (data.messages && Array.isArray(data.messages)) {
+          setMessages(data.messages)
+        }
+
         setOtherUser(data.otherUser)
 
         // Mark messages as read
-        if (data.messages.some((m) => !m.read && m.sender !== userId)) {
+        if (data.messages && data.messages.some((m: any) => !m.read && m.sender !== userId)) {
           await markMessagesAsRead({ userId, chatId })
         }
       } catch (error) {
@@ -60,22 +66,51 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!messageText.trim()) return
+    if (!messageText.trim() || sending) return
 
     try {
-      await sendMessage({
-        userId,
-        chatId,
-        content: messageText,
-      })
+      setSending(true)
 
+      // Optimistically add message to UI
+      const optimisticMessage = {
+        _id: Date.now().toString(),
+        sender: userId,
+        content: messageText,
+        read: false,
+        createdAt: new Date().toISOString(),
+        optimistic: true,
+      }
+
+      setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
 
-      // Fetch messages again to update the list
-      const data = await getChatMessages({ userId, chatId })
-      setMessages(data.messages)
+      // Focus the input field after sending
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 0)
+
+      // Send message to server
+      const result = await sendMessage({
+        userId,
+        chatId,
+        content: messageText.trim(),
+      })
+
+      if (!result.success) {
+        console.error("Failed to send message:", result.error)
+        // Remove optimistic message if failed
+        setMessages((prev) => prev.filter((m) => m._id !== optimisticMessage._id))
+      } else {
+        // Fetch messages again to update the list with the actual message
+        const data = await getChatMessages({ userId, chatId })
+        if (data.messages && Array.isArray(data.messages)) {
+          setMessages(data.messages)
+        }
+      }
     } catch (error) {
       console.error("Error sending message:", error)
+    } finally {
+      setSending(false)
     }
   }
 
@@ -97,24 +132,33 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
         <div className="space-y-4">
-          {messages.map((message) => (
-            <div key={message._id} className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}>
+          {messages.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
+          ) : (
+            messages.map((message, index) => (
               <div
-                className={`max-w-[70%] p-3 rounded-lg ${
-                  message.sender === userId ? "bg-blue-500 text-white" : "bg-white text-gray-800 border border-gray-200"
-                }`}
+                key={message._id || index}
+                className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}
               >
-                <p>{message.content}</p>
-                <div className={`text-xs mt-1 ${message.sender === userId ? "text-blue-100" : "text-gray-400"}`}>
-                  {new Date(message.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  {message.sender === userId && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+                <div
+                  className={`max-w-[70%] p-3 rounded-lg ${
+                    message.sender === userId
+                      ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                      : "bg-white text-gray-800 border border-gray-200"
+                  }`}
+                >
+                  <p className="break-words">{message.content}</p>
+                  <div className={`text-xs mt-1 ${message.sender === userId ? "text-blue-100" : "text-gray-400"}`}>
+                    {new Date(message.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {message.sender === userId && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -123,12 +167,14 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
       <div className="p-4 border-t border-gray-200 bg-white">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <Input
+            ref={inputRef}
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             placeholder="Type a message..."
             className="flex-1"
+            disabled={sending}
           />
-          <Button type="submit" disabled={!messageText.trim()}>
+          <Button type="submit" disabled={!messageText.trim() || sending}>
             <Send className="h-4 w-4" />
           </Button>
         </form>

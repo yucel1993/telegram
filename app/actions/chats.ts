@@ -44,13 +44,7 @@ export async function getUserChats({ userId }: { userId: string }) {
   }
 }
 
-export async function getChatMessages({
-  userId,
-  chatId,
-}: {
-  userId: string
-  chatId: string
-}) {
+export async function getChatMessages({ userId, chatId }: { userId: string; chatId: string }) {
   try {
     await connectToDatabase()
 
@@ -66,7 +60,7 @@ export async function getChatMessages({
     const otherUser = await User.findById(otherUserId).select("_id username")
 
     return {
-      messages: chat.messages,
+      messages: chat.messages || [],
       otherUser,
     }
   } catch (error) {
@@ -87,6 +81,39 @@ export async function sendMessage({
   try {
     await connectToDatabase()
 
+    // Check if this is a user ID rather than a chat ID (for nearby users)
+    if (chatId.length === 24 && /^[0-9a-fA-F]{24}$/.test(chatId)) {
+      try {
+        // Check if it's a valid chat ID first
+        const existingChat = await Chat.findById(chatId)
+
+        if (!existingChat) {
+          // It might be a user ID, let's check if a chat exists with these participants
+          const existingChatWithUser = await Chat.findOne({
+            participants: {
+              $all: [new mongoose.Types.ObjectId(userId), new mongoose.Types.ObjectId(chatId)],
+            },
+          })
+
+          if (existingChatWithUser) {
+            // Use the existing chat
+            chatId = existingChatWithUser._id.toString()
+          } else {
+            // Create a new chat with these participants
+            const newChat = new Chat({
+              participants: [userId, chatId],
+              messages: [],
+            })
+
+            await newChat.save()
+            chatId = newChat._id.toString()
+          }
+        }
+      } catch (error) {
+        console.error("Error checking chat:", error)
+      }
+    }
+
     const chat = await Chat.findById(chatId)
 
     if (!chat) {
@@ -94,28 +121,28 @@ export async function sendMessage({
     }
 
     // Add new message
-    chat.messages.push({
-      sender: userId,
+    const newMessage = {
+      sender: new mongoose.Types.ObjectId(userId),
       content,
       read: false,
-    })
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
+    chat.messages.push(newMessage)
     await chat.save()
 
-    return { success: true }
+    // Update the chat's updatedAt timestamp
+    await Chat.findByIdAndUpdate(chatId, { updatedAt: new Date() })
+
+    return { success: true, message: newMessage }
   } catch (error) {
     console.error("Error sending message:", error)
     return { success: false, error: "Failed to send message" }
   }
 }
 
-export async function markMessagesAsRead({
-  userId,
-  chatId,
-}: {
-  userId: string
-  chatId: string
-}) {
+export async function markMessagesAsRead({ userId, chatId }: { userId: string; chatId: string }) {
   try {
     await connectToDatabase()
 
