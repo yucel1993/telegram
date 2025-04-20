@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff } from "lucide-react"
+import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff, Loader2 } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { updateUserLocation, getNearbyUsers, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
@@ -31,6 +31,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]) // Properly typed state
   const [locationEnabled, setLocationEnabled] = useState(false)
   const [locationActive, setLocationActive] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [nearbyLoading, setNearbyLoading] = useState(false)
   const router = useRouter()
   const isMobile = useMobile()
 
@@ -46,8 +48,16 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
 
   const updateLocation = async () => {
     if (navigator.geolocation) {
+      setLocationLoading(true)
+
+      const timeoutId = setTimeout(() => {
+        // If it's taking more than 5 seconds, we'll show a message
+        // but keep waiting for the actual location
+      }, 5000)
+
       navigator.geolocation.getCurrentPosition(
         async (position) => {
+          clearTimeout(timeoutId)
           const { latitude, longitude } = position.coords
           await updateUserLocation({
             userId,
@@ -56,13 +66,22 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
           })
           setLocationEnabled(true)
           setLocationActive(true)
+          setLocationLoading(false)
         },
         (error) => {
+          clearTimeout(timeoutId)
           console.error("Error getting location:", error)
           // Even if there's an error, we should set locationEnabled to true
           // since the browser allowed the permission request
           setLocationEnabled(true)
           setLocationActive(false)
+          setLocationLoading(false)
+        },
+        // Options to improve location accuracy and timeout
+        {
+          enableHighAccuracy: true,
+          timeout: 30000, // 30 seconds timeout
+          maximumAge: 0, // Don't use cached position
         },
       )
     }
@@ -74,6 +93,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
 
   const handleDisableLocation = async () => {
     try {
+      setLocationLoading(true)
       await disableLocation({ userId })
       setLocationActive(false)
       // Keep locationEnabled true since the permission is still granted
@@ -81,20 +101,30 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
       setShowNearbyUsers(false)
     } catch (error) {
       console.error("Error disabling location:", error)
+    } finally {
+      setLocationLoading(false)
     }
   }
 
   const handleFindNearbyUsers = async () => {
     if (locationEnabled) {
+      setNearbyLoading(true)
+
       // If location is not active, enable it first
       if (!locationActive) {
         await updateLocation()
       }
 
-      const users = await getNearbyUsers({ userId, distance: 1000 })
-      setNearbyUsers(users as NearbyUser[]) // Type assertion to fix the error
-      setShowNearbyUsers(true)
-      setShowSearch(false)
+      try {
+        const users = await getNearbyUsers({ userId, distance: 1000 })
+        setNearbyUsers(users as NearbyUser[]) // Type assertion to fix the error
+        setShowNearbyUsers(true)
+        setShowSearch(false)
+      } catch (error) {
+        console.error("Error finding nearby users:", error)
+      } finally {
+        setNearbyLoading(false)
+      }
     }
   }
 
@@ -158,10 +188,19 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                   variant="outline"
                   className="flex-1"
                   onClick={handleFindNearbyUsers}
-                  disabled={!locationEnabled}
+                  disabled={!locationEnabled || locationLoading || nearbyLoading}
                 >
-                  <Users className="h-4 w-4 mr-2" />
-                  Nearby
+                  {nearbyLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-4 w-4 mr-2" />
+                      Nearby
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -169,40 +208,95 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
             {/* Location status indicators */}
             {!showSearch && !showNearbyUsers && (
               <>
-                {locationActive && (
+                {locationLoading && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-md text-sm">
+                    <div className="flex items-center text-blue-700 mb-1">
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      <span>Getting your location...</span>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">
+                      This may take up to 20 seconds depending on your device and connection.
+                    </p>
+                  </div>
+                )}
+
+                {!locationLoading && locationActive && (
                   <div className="mt-2 p-2 bg-green-50 rounded-md text-sm">
                     <div className="flex items-center text-green-700 mb-1">
                       <MapPin className="h-4 w-4 mr-1" />
                       <span>Location is active - others can find you</span>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleDisableLocation}>
-                      <MapPinOff className="h-3 w-3 mr-1" />
-                      Disable Location
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={handleDisableLocation}
+                      disabled={locationLoading}
+                    >
+                      {locationLoading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Disabling...
+                        </>
+                      ) : (
+                        <>
+                          <MapPinOff className="h-3 w-3 mr-1" />
+                          Disable Location
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}
 
-                {locationEnabled && !locationActive && (
+                {!locationLoading && locationEnabled && !locationActive && (
                   <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
                     <div className="flex items-center text-yellow-700 mb-1">
                       <MapPinOff className="h-4 w-4 mr-1" />
                       <span>Location is disabled - you're not discoverable</span>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleEnableLocation}>
-                      <MapPin className="h-3 w-3 mr-1" />
-                      Enable Location
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={handleEnableLocation}
+                      disabled={locationLoading}
+                    >
+                      {locationLoading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Enabling...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Enable Location
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}
 
-                {!locationEnabled && (
+                {!locationLoading && !locationEnabled && (
                   <div className="mt-2 p-2 bg-yellow-50 rounded-md text-sm">
                     <div className="flex items-center text-yellow-700 mb-1">
                       <MapPin className="h-4 w-4 mr-1" />
                       <span>Location permission needed</span>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full text-xs" onClick={handleEnableLocation}>
-                      Enable Location
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={handleEnableLocation}
+                      disabled={locationLoading}
+                    >
+                      {locationLoading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        "Enable Location"
+                      )}
                     </Button>
                   </div>
                 )}
