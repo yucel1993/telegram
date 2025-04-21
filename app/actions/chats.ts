@@ -108,14 +108,33 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
 
     // Check if it's a group chat
     if (chat.isGroup) {
-      // For group chats, get all participants' info for displaying names
-      const participantsInfo = await User.find({
-        _id: { $in: chat.participants },
+      // For group chats, we need to get ALL possible sender information, not just current participants
+      // This ensures we can display names for users who have left the group
+
+      // First, collect all unique sender IDs from messages
+      const allSenderIds = new Set<string>()
+      chat.messages.forEach((msg) => {
+        if (msg.sender) {
+          allSenderIds.add(msg.sender.toString())
+        }
+      })
+
+      // Add current participants to the set as well
+      chat.participants.forEach((p) => {
+        allSenderIds.add(p.toString())
+      })
+
+      // Convert the set to an array
+      const senderIdsArray = Array.from(allSenderIds)
+
+      // Get information for all these users
+      const usersInfo = await User.find({
+        _id: { $in: senderIdsArray.map((id) => new mongoose.Types.ObjectId(id)) },
       }).select("_id username")
 
       // Create a map of user IDs to usernames
       const userMap = new Map()
-      participantsInfo.forEach((user) => {
+      usersInfo.forEach((user) => {
         userMap.set(user._id.toString(), user.username)
       })
 
@@ -129,11 +148,16 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         }
 
         // If the sender is the current user, set senderName to "You"
-        if (message.sender.toString() === userId) {
+        if (message.sender && message.sender.toString() === userId) {
           message.senderName = "You"
+        } else if (message.sender) {
+          // Look up the sender's username in our map
+          const senderUsername = userMap.get(message.sender.toString())
+          message.senderName = senderUsername || "Unknown User"
         } else {
-          message.senderName = userMap.get(message.sender.toString()) || "Unknown User"
+          message.senderName = "Unknown User"
         }
+
         return message
       })
 
@@ -148,7 +172,7 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         isGroup: true,
         name: chat.name,
         description: chat.description,
-        participants: participantsInfo,
+        participants: usersInfo.filter((user) => chat.participants.some((p) => p.toString() === user._id.toString())),
         admins: chat.admins,
         isGroupMember,
         isAdmin,

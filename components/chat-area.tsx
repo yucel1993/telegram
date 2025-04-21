@@ -377,8 +377,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                         : "bg-white text-gray-800 border border-gray-200"
                     }`}
                   >
-                    {/* Show sender name for group chats if it's not the current user or if it's a new sender */}
-                    {isGroup && !isCurrentUser && isNewSender && (
+                    {/* Show sender name for group chats if it's not the current user */}
+                    {isGroup && !isCurrentUser && (
                       <div className="text-xs font-medium mb-1 text-gray-500">
                         {message.senderName || "Unknown User"}
                       </div>
