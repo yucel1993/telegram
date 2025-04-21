@@ -140,6 +140,9 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
       // Check if the current user is a member of the group
       const isGroupMember = chat.participants.some((p) => p.toString() === userId)
 
+      // Check if the current user is an admin
+      const isAdmin = chat.admins.some((a) => a.toString() === userId)
+
       return {
         messages: messagesWithSenderNames,
         isGroup: true,
@@ -148,6 +151,7 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         participants: participantsInfo,
         admins: chat.admins,
         isGroupMember,
+        isAdmin,
       }
     } else {
       // For direct chats, find the other user
@@ -287,5 +291,67 @@ export async function markMessagesAsRead({ userId, chatId }: { userId: string; c
   } catch (error) {
     console.error("Error marking messages as read:", error)
     return { success: false, error: "Failed to mark messages as read" }
+  }
+}
+
+// New function to delete a chat for a user
+export async function deleteChat({ userId, chatId }: { userId: string; chatId: string }) {
+  try {
+    await connectToDatabase()
+
+    const chat = await Chat.findById(chatId)
+
+    if (!chat) {
+      return { success: false, error: "Chat not found" }
+    }
+
+    if (chat.isGroup) {
+      // For group chats, remove the user from participants
+      await Chat.findByIdAndUpdate(chatId, {
+        $pull: {
+          participants: new mongoose.Types.ObjectId(userId),
+        },
+      })
+
+      // Add a system message about the user leaving
+      const user = await User.findById(userId)
+      const username = user ? user.username : "A user"
+
+      await Chat.findByIdAndUpdate(
+        chatId,
+        {
+          $push: {
+            messages: {
+              sender: new mongoose.Types.ObjectId(userId),
+              content: `${username} left the group`,
+              read: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              isSystemMessage: true,
+            },
+          },
+        },
+        { new: true },
+      )
+    } else {
+      // For direct chats, we'll just remove the user from participants
+      // This effectively "deletes" the chat for this user while preserving it for the other user
+      await Chat.findByIdAndUpdate(chatId, {
+        $pull: {
+          participants: new mongoose.Types.ObjectId(userId),
+        },
+      })
+
+      // If no participants are left, delete the chat entirely
+      const updatedChat = await Chat.findById(chatId)
+      if (updatedChat && updatedChat.participants.length === 0) {
+        await Chat.findByIdAndDelete(chatId)
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting chat:", error)
+    return { success: false, error: "Failed to delete chat" }
   }
 }

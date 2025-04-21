@@ -5,8 +5,19 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus } from "lucide-react"
-import { getChatMessages, sendMessage, markMessagesAsRead } from "@/app/actions/chats"
+import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus, Trash2, LogOut, MoreVertical } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { getChatMessages, sendMessage, markMessagesAsRead, deleteChat } from "@/app/actions/chats"
 import { joinGroup } from "@/app/actions/groups"
 import { useMobile } from "@/hooks/use-mobile"
 
@@ -29,7 +40,11 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [chatInitialized, setChatInitialized] = useState(false)
   const [isGroupMember, setIsGroupMember] = useState(true)
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false)
   const [joiningGroup, setJoiningGroup] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -71,10 +86,14 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           // Fix the type error by ensuring we always set a boolean value
           const isMember = data.participants ? data.participants.some((p: any) => p._id === userId) : false
           setIsGroupMember(isMember)
+
+          // Check if the current user is an admin
+          setIsGroupAdmin(data.isAdmin || false)
         } else {
           setIsGroup(false)
           setOtherUser(data.otherUser)
           setIsGroupMember(true) // Always a member in direct chats
+          setIsGroupAdmin(false)
         }
 
         setChatInitialized(true)
@@ -238,6 +257,31 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     }
   }
 
+  const handleDeleteChat = async () => {
+    setIsDeleting(true)
+    try {
+      const result = await deleteChat({
+        userId,
+        chatId,
+      })
+
+      if (result.success) {
+        // Navigate back to the chat list
+        if (onBack) {
+          onBack()
+        }
+      } else {
+        console.error("Failed to delete chat:", result.error)
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error)
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+      setShowLeaveDialog(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -251,27 +295,57 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     <div className="flex flex-col h-full">
       {/* Chat header - Sticky */}
       <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-        {isMobile && onBack && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 flex items-center">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to chats
-          </Button>
-        )}
-
-        {isGroup ? (
+        <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Users className="h-5 w-5 mr-2 text-gray-500" />
-            <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
-            {groupInfo?.description && (
-              <div className="ml-2 text-gray-500 text-sm flex items-center">
-                <Info className="h-3 w-3 mr-1" />
-                <span className="truncate max-w-[200px]">{groupInfo.description}</span>
+            {isMobile && onBack && (
+              <Button variant="ghost" size="sm" onClick={onBack} className="mr-2 flex items-center">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            )}
+
+            {isGroup ? (
+              <div className="flex items-center">
+                <Users className="h-5 w-5 mr-2 text-gray-500" />
+                <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
+                {groupInfo?.description && (
+                  <div className="ml-2 text-gray-500 text-sm flex items-center">
+                    <Info className="h-3 w-3 mr-1" />
+                    <span className="truncate max-w-[200px]">{groupInfo.description}</span>
+                  </div>
+                )}
               </div>
+            ) : (
+              <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
             )}
           </div>
-        ) : (
-          <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
-        )}
+
+          {/* Chat actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isGroup ? (
+                <>
+                  {isGroupMember && (
+                    <DropdownMenuItem onClick={() => setShowLeaveDialog(true)} className="text-red-600">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Leave Group
+                    </DropdownMenuItem>
+                  )}
+                </>
+              ) : (
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Chat
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Messages area - Add padding-top to prevent messages from being hidden under the header */}
@@ -368,6 +442,42 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           </form>
         )}
       </div>
+
+      {/* Delete Chat Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this chat? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteChat} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave Group Confirmation Dialog */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to leave this group? You will need to be added back by a member to rejoin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteChat} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+              {isDeleting ? "Leaving..." : "Leave Group"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
