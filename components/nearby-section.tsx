@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, User, Loader2, MapPin, RefreshCw } from "lucide-react"
+import { Users, User, Loader2, MapPin, RefreshCw, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getNearbyUsers } from "@/app/actions/users"
 import { getNearbyGroups } from "@/app/actions/groups"
@@ -34,6 +34,7 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
   const [nearbyGroups, setNearbyGroups] = useState<NearbyGroup[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingGroups, setLoadingGroups] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchNearbyUsers()
@@ -42,11 +43,13 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
 
   const fetchNearbyUsers = async () => {
     setLoadingUsers(true)
+    setError(null)
     try {
       const users = await getNearbyUsers({ userId, distance: 1000 })
       setNearbyUsers(users as NearbyUser[])
     } catch (error) {
       console.error("Error fetching nearby users:", error)
+      setError("Failed to load nearby users. Please try refreshing.")
     } finally {
       setLoadingUsers(false)
     }
@@ -54,12 +57,14 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
 
   const fetchNearbyGroups = async () => {
     setLoadingGroups(true)
+    setError(null)
     try {
       const groups = await getNearbyGroups({ userId, distance: 1000 })
       console.log("Fetched nearby groups:", groups)
       setNearbyGroups(groups as NearbyGroup[])
     } catch (error) {
       console.error("Error fetching nearby groups:", error)
+      setError("Failed to load nearby groups. Please try refreshing.")
     } finally {
       setLoadingGroups(false)
     }
@@ -82,6 +87,13 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
           Refresh
         </Button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-yellow-50 text-yellow-800 rounded-md flex items-start">
+          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          <div>{error}</div>
+        </div>
+      )}
 
       <Tabs defaultValue="users" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 mb-4">

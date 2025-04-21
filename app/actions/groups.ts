@@ -94,8 +94,8 @@ export async function createGroupWithLocation({
       participants.push(userId)
     }
 
-    // Create new group chat with basic info
-    const newGroup = {
+    // Create group data object
+    const groupData: any = {
       isGroup: true,
       name,
       description: description || null,
@@ -108,21 +108,28 @@ export async function createGroupWithLocation({
     if (location && location.latitude && location.longitude) {
       console.log("Adding location to group:", location)
 
-      // Add location data to the group
-      newGroup.location = {
+      // Add location in GeoJSON format
+      groupData.location = {
         type: "Point",
         coordinates: [location.longitude, location.latitude], // MongoDB uses [longitude, latitude]
-        lastUpdated: new Date(),
       }
     }
 
     // Create and save the group
-    const groupDoc = new Chat(newGroup)
-    await groupDoc.save()
+    const newGroup = new Chat(groupData)
+
+    // Log the group data before saving
+    console.log("Saving group with data:", JSON.stringify(groupData, null, 2))
+
+    await newGroup.save()
+
+    // Verify the saved group has location data
+    const savedGroup = await Chat.findById(newGroup._id)
+    console.log("Saved group location:", savedGroup?.location)
 
     return {
       success: true,
-      chatId: groupDoc._id.toString(),
+      chatId: newGroup._id.toString(),
     }
   } catch (error) {
     console.error("Error creating group with location:", error)
@@ -151,47 +158,125 @@ export async function getNearbyGroups({
       return []
     }
 
-    console.log("Searching for nearby groups with user coordinates:", user.location.coordinates)
+    console.log("User location coordinates:", user.location.coordinates)
 
-    // Find nearby groups
-    const nearbyGroups = await Chat.aggregate([
-      {
-        $match: {
-          isGroup: true,
-          "location.coordinates.0": { $ne: 0 },
-          "location.coordinates.1": { $ne: 0 },
-        },
-      },
-      {
-        $geoNear: {
-          near: {
-            type: "Point",
-            coordinates: user.location.coordinates,
+    // First, let's check if there are any groups with location data
+    const groupsWithLocation = await Chat.find({
+      isGroup: true,
+      "location.type": "Point",
+      "location.coordinates": { $exists: true, $ne: null },
+    }).limit(5)
+
+    console.log(`Found ${groupsWithLocation.length} groups with location data`)
+
+    if (groupsWithLocation.length > 0) {
+      console.log("Sample group location:", groupsWithLocation[0].location)
+    }
+
+    // Try a simpler approach first - find all groups and calculate distance manually
+    try {
+      const allGroups = await Chat.find({
+        isGroup: true,
+        "location.type": "Point",
+        "location.coordinates": { $exists: true, $ne: null },
+      })
+
+      console.log(`Found ${allGroups.length} total groups with location`)
+
+      // Filter and calculate distance manually
+      const nearbyGroups = allGroups
+        .filter((group) => {
+          if (!group.location?.coordinates || group.location.coordinates.length !== 2) {
+            return false
+          }
+
+          // Calculate rough distance (this is not as accurate as MongoDB's $geoNear but works for testing)
+          const [groupLng, groupLat] = group.location.coordinates
+          const [userLng, userLat] = user.location.coordinates
+
+          // Simple distance calculation (not accurate for large distances but OK for nearby)
+          const latDiff = Math.abs(groupLat - userLat) * 111000 // rough meters per degree latitude
+          const lngDiff = Math.abs(groupLng - userLng) * 111000 * Math.cos((userLat * Math.PI) / 180)
+          const roughDistance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
+
+          return roughDistance <= distance
+        })
+        .map((group) => {
+          // Calculate distance
+          const [groupLng, groupLat] = group.location.coordinates
+          const [userLng, userLat] = user.location.coordinates
+
+          const latDiff = Math.abs(groupLat - userLat) * 111000
+          const lngDiff = Math.abs(groupLng - userLng) * 111000 * Math.cos((userLat * Math.PI) / 180)
+          const roughDistance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
+
+          return {
+            _id: group._id,
+            name: group.name,
+            description: group.description,
+            distance: roughDistance,
+            participantsCount: group.participants.length,
+            location: group.location,
+          }
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 20)
+
+      console.log(`Found ${nearbyGroups.length} nearby groups using manual calculation`)
+
+      if (nearbyGroups.length > 0) {
+        return nearbyGroups
+      }
+    } catch (error) {
+      console.error("Error with manual nearby calculation:", error)
+    }
+
+    // If manual calculation didn't work or found no groups, try the geospatial query
+    try {
+      console.log("Trying geospatial query with user coordinates:", user.location.coordinates)
+
+      const nearbyGroups = await Chat.aggregate([
+        {
+          $match: {
+            isGroup: true,
+            "location.type": "Point",
+            "location.coordinates": { $exists: true, $ne: null },
           },
-          distanceField: "distance",
-          maxDistance: distance, // in meters
-          spherical: true,
-          query: { isGroup: true }, // Only find groups
         },
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          description: 1,
-          distance: 1,
-          participantsCount: { $size: "$participants" },
-          location: 1, // Include location for debugging
+        {
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: user.location.coordinates,
+            },
+            distanceField: "distance",
+            maxDistance: distance,
+            spherical: true,
+          },
         },
-      },
-      {
-        $limit: 20,
-      },
-    ])
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            description: 1,
+            distance: 1,
+            participantsCount: { $size: "$participants" },
+            location: 1,
+          },
+        },
+        {
+          $limit: 20,
+        },
+      ])
 
-    console.log("Found nearby groups:", nearbyGroups.length)
+      console.log(`Found ${nearbyGroups.length} nearby groups using $geoNear`)
+      return nearbyGroups
+    } catch (error) {
+      console.error("Error with geospatial query:", error)
+    }
 
-    return nearbyGroups
+    // If all else fails, return an empty array
+    return []
   } catch (error) {
     console.error("Error finding nearby groups:", error)
     return []

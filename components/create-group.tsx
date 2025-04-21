@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin, Loader2 } from "lucide-react"
+import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin, Loader2, AlertCircle } from "lucide-react"
 import { searchUsers } from "@/app/actions/groups"
 import { createGroupWithLocation } from "@/app/actions/groups"
 
@@ -30,6 +30,8 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
   const [enableLocation, setEnableLocation] = useState(false)
   const [locationAvailable, setLocationAvailable] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [creationError, setCreationError] = useState<string | null>(null)
 
   useEffect(() => {
     // Check if location is available
@@ -82,6 +84,8 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
     if (!groupName.trim() || selectedUsers.length === 0) return
 
     setCreating(true)
+    setCreationError(null)
+
     try {
       const participantIds = selectedUsers.map((user) => user._id)
 
@@ -90,6 +94,8 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
       // If location is enabled, get current coordinates
       if (enableLocation && locationAvailable) {
         setLocationLoading(true)
+        setLocationError(null)
+
         try {
           const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -107,7 +113,9 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
           console.log("Got location for group:", location)
         } catch (error) {
           console.error("Error getting location:", error)
+          setLocationError("Failed to get your location. Please try again or disable location.")
           // Continue without location if there's an error
+          location = null
         } finally {
           setLocationLoading(false)
         }
@@ -125,9 +133,11 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
         onGroupCreated(result.chatId)
       } else {
         console.error("Failed to create group:", result.error)
+        setCreationError(result.error || "Failed to create group. Please try again.")
       }
     } catch (error) {
       console.error("Error creating group:", error)
+      setCreationError("An unexpected error occurred. Please try again.")
     } finally {
       setCreating(false)
     }
@@ -238,6 +248,16 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
               </div>
             </div>
 
+            {creationError && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md flex items-start">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">Error creating group</p>
+                  <p className="text-sm">{creationError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div>
                 <label htmlFor="groupName" className="block text-sm font-medium mb-1">
@@ -265,17 +285,26 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
               </div>
 
               {locationAvailable && (
-                <div className="flex items-center justify-between py-2 bg-gray-50 p-3 rounded-md">
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <span className="text-sm font-medium">Enable Location for Nearby Discovery</span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        This will allow others to find this group when searching nearby
-                      </p>
+                <div className="flex flex-col bg-gray-50 p-3 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <span className="text-sm font-medium">Enable Location for Nearby Discovery</span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will allow others to find this group when searching nearby
+                        </p>
+                      </div>
                     </div>
+                    <Switch checked={enableLocation} onCheckedChange={setEnableLocation} aria-label="Enable location" />
                   </div>
-                  <Switch checked={enableLocation} onCheckedChange={setEnableLocation} aria-label="Enable location" />
+
+                  {locationError && enableLocation && (
+                    <div className="mt-2 text-xs text-red-600 flex items-center">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {locationError}
+                    </div>
+                  )}
                 </div>
               )}
 
