@@ -164,6 +164,7 @@ export async function searchUsersAndGroups({
     const groups = await Chat.find({
       isGroup: true,
       $or: [{ name: searchRegex }, { description: searchRegex }],
+      location: { $exists: false }, // Only groups without location
     })
       .select("_id name description participants")
       .limit(3)
