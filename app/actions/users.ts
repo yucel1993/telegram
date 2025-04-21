@@ -133,6 +133,60 @@ export async function searchUsers({
   }
 }
 
+// Add this new function to search for both users and groups
+export async function searchUsersAndGroups({
+  userId,
+  query,
+}: {
+  userId: string
+  query: string
+}) {
+  try {
+    await connectToDatabase()
+
+    // Make sure query is not empty
+    if (!query.trim()) {
+      return { users: [], groups: [] }
+    }
+
+    // Create a case-insensitive regex for the search
+    const searchRegex = { $regex: query, $options: "i" }
+
+    // Search for users
+    const users = await User.find({
+      _id: { $ne: userId },
+      username: searchRegex,
+    })
+      .select("_id username lastActive")
+      .limit(3)
+
+    // Search for all groups (not just nearby ones)
+    const groups = await Chat.find({
+      isGroup: true,
+      $or: [{ name: searchRegex }, { description: searchRegex }],
+    })
+      .select("_id name description participants")
+      .limit(3)
+
+    // Format group results to include participant count
+    const formattedGroups = groups.map((group) => ({
+      _id: group._id,
+      name: group.name,
+      description: group.description,
+      participantsCount: group.participants.length,
+      isGroup: true,
+    }))
+
+    return {
+      users,
+      groups: formattedGroups,
+    }
+  } catch (error) {
+    console.error("Error searching users and groups:", error)
+    return { users: [], groups: [] }
+  }
+}
+
 export async function createChat({
   userId,
   otherUserId,
