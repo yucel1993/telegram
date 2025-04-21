@@ -68,7 +68,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           setParticipants(data.participants || [])
 
           // Check if the current user is a member of the group
-          const isMember = data.participants?.some((p: any) => p._id === userId)
+          // Fix the type error by ensuring we always set a boolean value
+          const isMember = data.participants ? data.participants.some((p: any) => p._id === userId) : false
           setIsGroupMember(isMember)
         } else {
           setIsGroup(false)
@@ -283,6 +284,15 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               // Check if this is a new sender compared to the previous message
               const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
               const isCurrentUser = message.sender === userId
+
+              // Handle system messages differently
+              if (message.isSystemMessage) {
+                return (
+                  <div key={message._id || index} className="flex justify-center">
+                    <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">{message.content}</div>
+                  </div>
+                )
+              }
 
               return (
                 <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
