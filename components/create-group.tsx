@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin } from "lucide-react"
+import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin, Loader2 } from "lucide-react"
 import { searchUsers } from "@/app/actions/groups"
 import { createGroupWithLocation } from "@/app/actions/groups"
 
@@ -29,6 +29,7 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
   const [creating, setCreating] = useState(false)
   const [enableLocation, setEnableLocation] = useState(false)
   const [locationAvailable, setLocationAvailable] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
 
   useEffect(() => {
     // Check if location is available
@@ -88,6 +89,7 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
 
       // If location is enabled, get current coordinates
       if (enableLocation && locationAvailable) {
+        setLocationLoading(true)
         try {
           const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -101,9 +103,13 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           }
+
+          console.log("Got location for group:", location)
         } catch (error) {
           console.error("Error getting location:", error)
           // Continue without location if there's an error
+        } finally {
+          setLocationLoading(false)
         }
       }
 
@@ -259,10 +265,15 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
               </div>
 
               {locationAvailable && (
-                <div className="flex items-center justify-between py-2">
+                <div className="flex items-center justify-between py-2 bg-gray-50 p-3 rounded-md">
                   <div className="flex items-center space-x-2">
                     <MapPin className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">Enable Location for Nearby Discovery</span>
+                    <div>
+                      <span className="text-sm font-medium">Enable Location for Nearby Discovery</span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        This will allow others to find this group when searching nearby
+                      </p>
+                    </div>
                   </div>
                   <Switch checked={enableLocation} onCheckedChange={setEnableLocation} aria-label="Enable location" />
                 </div>
@@ -285,13 +296,13 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
               <div className="pt-4">
                 <Button
                   onClick={handleCreateGroup}
-                  disabled={creating || !groupName.trim() || selectedUsers.length === 0}
+                  disabled={creating || locationLoading || !groupName.trim() || selectedUsers.length === 0}
                   className="w-full"
                 >
-                  {creating ? (
+                  {creating || locationLoading ? (
                     <>
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                      Creating...
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {locationLoading ? "Getting location..." : "Creating..."}
                     </>
                   ) : (
                     <>

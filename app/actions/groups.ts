@@ -94,18 +94,21 @@ export async function createGroupWithLocation({
       participants.push(userId)
     }
 
-    // Create new group chat
-    const newGroup = new Chat({
+    // Create new group chat with basic info
+    const newGroup = {
       isGroup: true,
       name,
       description: description || null,
       participants: participants.map((id) => new mongoose.Types.ObjectId(id)),
       admins: [new mongoose.Types.ObjectId(userId)], // Creator is the admin
       messages: [],
-    })
+    }
 
     // Add location if provided
-    if (location) {
+    if (location && location.latitude && location.longitude) {
+      console.log("Adding location to group:", location)
+
+      // Add location data to the group
       newGroup.location = {
         type: "Point",
         coordinates: [location.longitude, location.latitude], // MongoDB uses [longitude, latitude]
@@ -113,14 +116,16 @@ export async function createGroupWithLocation({
       }
     }
 
-    await newGroup.save()
+    // Create and save the group
+    const groupDoc = new Chat(newGroup)
+    await groupDoc.save()
 
     return {
       success: true,
-      chatId: newGroup._id.toString(),
+      chatId: groupDoc._id.toString(),
     }
   } catch (error) {
-    console.error("Error creating group:", error)
+    console.error("Error creating group with location:", error)
     return {
       success: false,
       error: "Failed to create group",
@@ -142,11 +147,21 @@ export async function getNearbyGroups({
     const user = await User.findById(userId)
 
     if (!user?.location?.coordinates || (user.location.coordinates[0] === 0 && user.location.coordinates[1] === 0)) {
+      console.log("User has no valid location")
       return []
     }
 
+    console.log("Searching for nearby groups with user coordinates:", user.location.coordinates)
+
     // Find nearby groups
     const nearbyGroups = await Chat.aggregate([
+      {
+        $match: {
+          isGroup: true,
+          "location.coordinates.0": { $ne: 0 },
+          "location.coordinates.1": { $ne: 0 },
+        },
+      },
       {
         $geoNear: {
           near: {
@@ -166,12 +181,15 @@ export async function getNearbyGroups({
           description: 1,
           distance: 1,
           participantsCount: { $size: "$participants" },
+          location: 1, // Include location for debugging
         },
       },
       {
         $limit: 20,
       },
     ])
+
+    console.log("Found nearby groups:", nearbyGroups.length)
 
     return nearbyGroups
   } catch (error) {

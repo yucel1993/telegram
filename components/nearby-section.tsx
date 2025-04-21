@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, User, Loader2, MapPin } from "lucide-react"
+import { Users, User, Loader2, MapPin, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { getNearbyUsers } from "@/app/actions/users"
 import { getNearbyGroups } from "@/app/actions/groups"
 
@@ -55,6 +56,7 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
     setLoadingGroups(true)
     try {
       const groups = await getNearbyGroups({ userId, distance: 1000 })
+      console.log("Fetched nearby groups:", groups)
       setNearbyGroups(groups as NearbyGroup[])
     } catch (error) {
       console.error("Error fetching nearby groups:", error)
@@ -63,8 +65,24 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
     }
   }
 
+  const handleRefresh = () => {
+    if (activeTab === "users") {
+      fetchNearbyUsers()
+    } else {
+      fetchNearbyGroups()
+    }
+  }
+
   return (
     <div className="p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h2 className="font-medium">Nearby (1000m)</h2>
+        <Button variant="ghost" size="sm" onClick={handleRefresh} className="flex items-center">
+          <RefreshCw className="h-4 w-4 mr-1" />
+          Refresh
+        </Button>
+      </div>
+
       <Tabs defaultValue="users" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 mb-4">
           <TabsTrigger value="users" className="flex items-center">
@@ -78,7 +96,6 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
         </TabsList>
 
         <TabsContent value="users">
-          <h3 className="font-medium mb-2">Nearby Users (1000m)</h3>
           {loadingUsers ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -105,7 +122,6 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
         </TabsContent>
 
         <TabsContent value="groups">
-          <h3 className="font-medium mb-2">Nearby Groups (1000m)</h3>
           {loadingGroups ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -134,7 +150,10 @@ export default function NearbySection({ userId, onSelectChat, onBack }: NearbySe
               ))}
             </div>
           ) : (
-            <div className="text-gray-500 text-sm text-center py-8">No nearby groups found</div>
+            <div className="text-gray-500 text-sm text-center py-8">
+              <p>No nearby groups found</p>
+              <p className="text-xs mt-2">Try creating a group with location enabled</p>
+            </div>
           )}
         </TabsContent>
       </Tabs>
