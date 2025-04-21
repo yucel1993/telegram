@@ -61,6 +61,7 @@ export async function getUserChats({ userId }: { userId: string }) {
   }
 }
 
+// Update the getChatMessages function to include isGroupMember information
 export async function getChatMessages({ userId, chatId }: { userId: string; chatId: string }) {
   try {
     await connectToDatabase()
@@ -121,6 +122,12 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
       // Add sender names to messages
       const messagesWithSenderNames = chat.messages.map((msg) => {
         const message = msg.toObject ? msg.toObject() : msg
+
+        // If it's a system message, don't modify the sender name
+        if (message.isSystemMessage) {
+          return message
+        }
+
         // If the sender is the current user, set senderName to "You"
         if (message.sender.toString() === userId) {
           message.senderName = "You"
@@ -130,6 +137,9 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         return message
       })
 
+      // Check if the current user is a member of the group
+      const isGroupMember = chat.participants.some((p) => p.toString() === userId)
+
       return {
         messages: messagesWithSenderNames,
         isGroup: true,
@@ -137,6 +147,7 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         description: chat.description,
         participants: participantsInfo,
         admins: chat.admins,
+        isGroupMember,
       }
     } else {
       // For direct chats, find the other user
@@ -147,6 +158,7 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         messages: chat.messages || [],
         otherUser,
         isGroup: false,
+        isGroupMember: true, // Always a member in direct chats
       }
     }
   } catch (error) {

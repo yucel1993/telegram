@@ -5,8 +5,9 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowDown, ArrowLeft, Users, Info } from "lucide-react"
+import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus } from "lucide-react"
 import { getChatMessages, sendMessage, markMessagesAsRead } from "@/app/actions/chats"
+import { joinGroup } from "@/app/actions/groups"
 import { useMobile } from "@/hooks/use-mobile"
 
 interface ChatAreaProps {
@@ -27,6 +28,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [autoScroll, setAutoScroll] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [chatInitialized, setChatInitialized] = useState(false)
+  const [isGroupMember, setIsGroupMember] = useState(true)
+  const [joiningGroup, setJoiningGroup] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -63,9 +66,14 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             admins: data.admins,
           })
           setParticipants(data.participants || [])
+
+          // Check if the current user is a member of the group
+          const isMember = data.participants?.some((p: any) => p._id === userId)
+          setIsGroupMember(isMember)
         } else {
           setIsGroup(false)
           setOtherUser(data.otherUser)
+          setIsGroupMember(true) // Always a member in direct chats
         }
 
         setChatInitialized(true)
@@ -202,6 +210,33 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     }
   }
 
+  const handleJoinGroup = async () => {
+    if (joiningGroup) return
+
+    setJoiningGroup(true)
+    try {
+      const result = await joinGroup({
+        userId,
+        chatId,
+      })
+
+      if (result.success) {
+        setIsGroupMember(true)
+        // Refresh messages to update participants list
+        const data = await getChatMessages({ userId, chatId })
+        if (data.participants) {
+          setParticipants(data.participants)
+        }
+      } else {
+        console.error("Failed to join group:", result.error)
+      }
+    } catch (error) {
+      console.error("Error joining group:", error)
+    } finally {
+      setJoiningGroup(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -238,8 +273,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         )}
       </div>
 
-      {/* Messages area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 bg-gray-50 relative">
+      {/* Messages area - Add padding-top to prevent messages from being hidden under the header */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-6 bg-gray-50 relative">
         <div className="space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
@@ -292,29 +327,36 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         )}
       </div>
 
-      {/* Message input - always show this, even for new chats */}
+      {/* Message input or Join Group button */}
       <div className="p-4 border-t border-gray-200 bg-white mt-auto">
-        <form onSubmit={handleSendMessage} className="flex space-x-2">
-          <Input
-            ref={inputRef}
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1"
-            disabled={sending}
-            onFocus={() => {
-              // On mobile, wait a bit for the keyboard to appear, then scroll
-              setTimeout(() => {
-                if (inputRef.current) {
-                  inputRef.current.scrollIntoView({ behavior: "smooth" })
-                }
-              }, 300)
-            }}
-          />
-          <Button type="submit" disabled={!messageText.trim() || sending}>
-            <Send className="h-4 w-4" />
+        {isGroup && !isGroupMember ? (
+          <Button onClick={handleJoinGroup} className="w-full flex items-center justify-center" disabled={joiningGroup}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
-        </form>
+        ) : (
+          <form onSubmit={handleSendMessage} className="flex space-x-2">
+            <Input
+              ref={inputRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1"
+              disabled={sending}
+              onFocus={() => {
+                // On mobile, wait a bit for the keyboard to appear, then scroll
+                setTimeout(() => {
+                  if (inputRef.current) {
+                    inputRef.current.scrollIntoView({ behavior: "smooth" })
+                  }
+                }, 300)
+              }}
+            />
+            <Button type="submit" disabled={!messageText.trim() || sending}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   )

@@ -21,6 +21,10 @@ const MessageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    isSystemMessage: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 )

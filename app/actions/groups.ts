@@ -414,3 +414,64 @@ export async function updateGroupInfo({
     return { success: false, error: "Failed to update group info" }
   }
 }
+
+export async function joinGroup({
+  userId,
+  chatId,
+}: {
+  userId: string
+  chatId: string
+}) {
+  try {
+    await connectToDatabase()
+
+    // Check if the chat exists and is a group
+    const chat = await Chat.findById(chatId)
+
+    if (!chat) {
+      return { success: false, error: "Group not found" }
+    }
+
+    if (!chat.isGroup) {
+      return { success: false, error: "This is not a group chat" }
+    }
+
+    // Check if user is already a member
+    if (chat.participants.some((p) => p.toString() === userId)) {
+      return { success: true, message: "Already a member" }
+    }
+
+    // Add user to participants
+    await Chat.findByIdAndUpdate(chatId, {
+      $addToSet: {
+        participants: new mongoose.Types.ObjectId(userId),
+      },
+    })
+
+    // Add a system message about the user joining
+    const user = await User.findById(userId)
+    const username = user ? user.username : "A user"
+
+    await Chat.findByIdAndUpdate(
+      chatId,
+      {
+        $push: {
+          messages: {
+            sender: new mongoose.Types.ObjectId(userId),
+            content: `${username} joined the group`,
+            read: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isSystemMessage: true,
+          },
+        },
+      },
+      { new: true },
+    )
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error joining group:", error)
+    return { success: false, error: "Failed to join group" }
+  }
+}

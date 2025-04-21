@@ -115,6 +115,15 @@ body {
   .overflow-y-auto {
     -webkit-overflow-scrolling: touch;
     max-height: calc(100vh - 120px); /* Adjust based on your header/footer height */
+    padding-top: 10px; /* Add padding to prevent content from being hidden under the header */
+  }
+
+  /* Ensure the sticky header doesn't overlap content */
+  .sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: white;
   }
 }
 
