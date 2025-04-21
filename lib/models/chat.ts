@@ -15,17 +15,45 @@ const MessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true },
 )
 
 const ChatSchema = new mongoose.Schema(
   {
+    isGroup: {
+      type: Boolean,
+      default: false,
+    },
+    name: {
+      type: String,
+      default: null,
+    },
+    description: {
+      type: String,
+      default: null,
+    },
+    photo: {
+      type: String,
+      default: null,
+    },
     participants: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true,
+      },
+    ],
+    admins: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
       },
     ],
     messages: [MessageSchema],

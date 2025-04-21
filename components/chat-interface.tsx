@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff, Loader2 } from "lucide-react"
+import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff, Loader2, UserPlus } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { updateUserLocation, getNearbyUsers, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
 import ChatArea from "@/components/chat-area"
 import UserSearch from "@/components/user-search"
+import CreateGroup from "@/components/create-group"
 import { useMobile } from "@/hooks/use-mobile"
 
 // Define the NearbyUser interface
@@ -28,6 +29,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
   const [showNearbyUsers, setShowNearbyUsers] = useState(false)
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]) // Properly typed state
   const [locationEnabled, setLocationEnabled] = useState(false)
   const [locationActive, setLocationActive] = useState(false)
@@ -120,6 +122,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
         setNearbyUsers(users as NearbyUser[]) // Type assertion to fix the error
         setShowNearbyUsers(true)
         setShowSearch(false)
+        setShowCreateGroup(false)
       } catch (error) {
         console.error("Error finding nearby users:", error)
       } finally {
@@ -138,6 +141,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setSelectedChat(chatId)
     setShowSearch(false)
     setShowNearbyUsers(false)
+    setShowCreateGroup(false)
   }
 
   const handleBackClick = () => {
@@ -147,10 +151,18 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const handleBackToChats = () => {
     setShowNearbyUsers(false)
     setShowSearch(false)
+    setShowCreateGroup(false)
   }
 
   const handleSearchClick = () => {
     setShowSearch(true)
+    setShowNearbyUsers(false)
+    setShowCreateGroup(false)
+  }
+
+  const handleCreateGroupClick = () => {
+    setShowCreateGroup(true)
+    setShowSearch(false)
     setShowNearbyUsers(false)
   }
 
@@ -171,42 +183,49 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               </Button>
             </div>
 
-            {(showSearch || showNearbyUsers) && (
+            {(showSearch || showNearbyUsers || showCreateGroup) && (
               <Button variant="outline" size="sm" onClick={handleBackToChats} className="mb-2 w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Chats
               </Button>
             )}
 
-            {!showSearch && !showNearbyUsers && (
-              <div className="flex space-x-2">
-                <Button variant="outline" className="flex-1" onClick={handleSearchClick}>
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
+            {!showSearch && !showNearbyUsers && !showCreateGroup && (
+              <>
+                <div className="flex space-x-2 mb-2">
+                  <Button variant="outline" className="flex-1" onClick={handleSearchClick}>
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleFindNearbyUsers}
+                    disabled={!locationEnabled || locationLoading || nearbyLoading}
+                  >
+                    {nearbyLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="h-4 w-4 mr-2" />
+                        Nearby
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <Button variant="outline" className="w-full" onClick={handleCreateGroupClick}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  New Group
                 </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleFindNearbyUsers}
-                  disabled={!locationEnabled || locationLoading || nearbyLoading}
-                >
-                  {nearbyLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <Users className="h-4 w-4 mr-2" />
-                      Nearby
-                    </>
-                  )}
-                </Button>
-              </div>
+              </>
             )}
 
             {/* Location status indicators */}
-            {!showSearch && !showNearbyUsers && (
+            {!showSearch && !showNearbyUsers && !showCreateGroup && (
               <>
                 {locationLoading && (
                   <div className="mt-2 p-2 bg-blue-50 rounded-md text-sm">
@@ -327,6 +346,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                   <div className="text-gray-500 text-sm">No nearby users found</div>
                 )}
               </div>
+            ) : showCreateGroup ? (
+              <CreateGroup userId={userId} onBack={handleBackToChats} onGroupCreated={handleSelectChat} />
             ) : (
               <UserChatList userId={userId} onSelectChat={handleSelectChat} selectedChatId={selectedChat} />
             )}
