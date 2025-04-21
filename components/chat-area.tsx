@@ -5,19 +5,24 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowDown } from "lucide-react"
+import { Send, ArrowDown, ArrowLeft, Users, Info } from "lucide-react"
 import { getChatMessages, sendMessage, markMessagesAsRead } from "@/app/actions/chats"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface ChatAreaProps {
   userId: string
   chatId: string
+  onBack?: () => void
 }
 
-export default function ChatArea({ userId, chatId }: ChatAreaProps) {
+export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [messageText, setMessageText] = useState("")
   const [otherUser, setOtherUser] = useState<any>(null)
+  const [isGroup, setIsGroup] = useState(false)
+  const [groupInfo, setGroupInfo] = useState<any>(null)
+  const [participants, setParticipants] = useState<any[]>([])
   const [sending, setSending] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -27,6 +32,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastMessageCountRef = useRef(0)
+  const isMobile = useMobile()
 
   useEffect(() => {
     async function fetchMessages() {
@@ -48,7 +54,20 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
           }
         }
 
-        setOtherUser(data.otherUser)
+        // Set group info if it's a group chat
+        if (data.isGroup) {
+          setIsGroup(true)
+          setGroupInfo({
+            name: data.name,
+            description: data.description,
+            admins: data.admins,
+          })
+          setParticipants(data.participants || [])
+        } else {
+          setIsGroup(false)
+          setOtherUser(data.otherUser)
+        }
+
         setChatInitialized(true)
 
         // Mark messages as read
@@ -138,6 +157,7 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
         read: false,
         createdAt: new Date().toISOString(),
         optimistic: true,
+        senderName: "You", // For group chats
       }
 
       setMessages((prev) => [...prev, optimisticMessage])
@@ -193,9 +213,29 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
   // Always show the chat UI, even if there are no messages yet
   return (
     <div className="flex flex-col h-full">
-      {/* Chat header */}
-      <div className="p-4 border-b border-gray-200 bg-white">
-        <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+      {/* Chat header - Sticky */}
+      <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+        {isMobile && onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="mb-2 flex items-center">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to chats
+          </Button>
+        )}
+
+        {isGroup ? (
+          <div className="flex items-center">
+            <Users className="h-5 w-5 mr-2 text-gray-500" />
+            <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
+            {groupInfo?.description && (
+              <div className="ml-2 text-gray-500 text-sm flex items-center">
+                <Info className="h-3 w-3 mr-1" />
+                <span className="truncate max-w-[200px]">{groupInfo.description}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+        )}
       </div>
 
       {/* Messages area */}
@@ -204,29 +244,38 @@ export default function ChatArea({ userId, chatId }: ChatAreaProps) {
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
           ) : (
-            messages.map((message, index) => (
-              <div
-                key={message._id || index}
-                className={`flex ${message.sender === userId ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[70%] p-3 rounded-lg ${
-                    message.sender === userId
-                      ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
-                      : "bg-white text-gray-800 border border-gray-200"
-                  }`}
-                >
-                  <p className="break-words">{message.content}</p>
-                  <div className={`text-xs mt-1 ${message.sender === userId ? "text-blue-100" : "text-gray-400"}`}>
-                    {new Date(message.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {message.sender === userId && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+            messages.map((message, index) => {
+              // Check if this is a new sender compared to the previous message
+              const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
+              const isCurrentUser = message.sender === userId
+
+              return (
+                <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[70%] p-3 rounded-lg ${
+                      isCurrentUser
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                        : "bg-white text-gray-800 border border-gray-200"
+                    }`}
+                  >
+                    {/* Show sender name for group chats if it's not the current user or if it's a new sender */}
+                    {isGroup && !isCurrentUser && isNewSender && (
+                      <div className="text-xs font-medium mb-1 text-gray-500">
+                        {message.senderName || "Unknown User"}
+                      </div>
+                    )}
+                    <p className="break-words">{message.content}</p>
+                    <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
           <div ref={messagesEndRef} />
         </div>

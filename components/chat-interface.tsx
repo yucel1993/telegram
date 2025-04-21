@@ -3,22 +3,15 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, Users, ArrowLeft, MapPinOff, Loader2, UserPlus } from "lucide-react"
+import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus } from "lucide-react"
 import { logout } from "@/app/actions/auth"
-import { updateUserLocation, getNearbyUsers, disableLocation } from "@/app/actions/users"
+import { updateUserLocation, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
 import ChatArea from "@/components/chat-area"
 import UserSearch from "@/components/user-search"
 import CreateGroup from "@/components/create-group"
+import NearbySection from "@/components/nearby-section"
 import { useMobile } from "@/hooks/use-mobile"
-
-// Define the NearbyUser interface
-interface NearbyUser {
-  _id: string
-  username: string
-  distance: number
-  lastActive?: Date
-}
 
 interface ChatInterfaceProps {
   userId: string
@@ -30,7 +23,6 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [showSearch, setShowSearch] = useState(false)
   const [showNearbyUsers, setShowNearbyUsers] = useState(false)
   const [showCreateGroup, setShowCreateGroup] = useState(false)
-  const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]) // Properly typed state
   const [locationEnabled, setLocationEnabled] = useState(false)
   const [locationActive, setLocationActive] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -118,8 +110,6 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
       }
 
       try {
-        const users = await getNearbyUsers({ userId, distance: 1000 })
-        setNearbyUsers(users as NearbyUser[]) // Type assertion to fix the error
         setShowNearbyUsers(true)
         setShowSearch(false)
         setShowCreateGroup(false)
@@ -210,7 +200,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                       </>
                     ) : (
                       <>
-                        <Users className="h-4 w-4 mr-2" />
+                        <MapPin className="h-4 w-4 mr-2" />
                         Nearby
                       </>
                     )}
@@ -327,25 +317,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
             {showSearch ? (
               <UserSearch userId={userId} onSelectUser={handleSelectChat} />
             ) : showNearbyUsers ? (
-              <div className="p-4">
-                <h3 className="font-medium mb-2">Nearby Users (1000m)</h3>
-                {nearbyUsers.length > 0 ? (
-                  <div className="space-y-2">
-                    {nearbyUsers.map((user) => (
-                      <div
-                        key={user._id}
-                        className="p-3 bg-gray-50 rounded-md cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleSelectChat(user._id)}
-                      >
-                        <div className="font-medium">{user.username}</div>
-                        <div className="text-sm text-gray-500">{user.distance.toFixed(0)}m away</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-gray-500 text-sm">No nearby users found</div>
-                )}
-              </div>
+              <NearbySection userId={userId} onSelectChat={handleSelectChat} onBack={handleBackToChats} />
             ) : showCreateGroup ? (
               <CreateGroup userId={userId} onBack={handleBackToChats} onGroupCreated={handleSelectChat} />
             ) : (
@@ -359,19 +331,9 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
       {showChatArea && (
         <div className="flex-1 flex flex-col h-full">
           {selectedChat ? (
-            <>
-              {isMobile && (
-                <div className="p-2 bg-white border-b border-gray-200">
-                  <Button variant="ghost" size="sm" onClick={handleBackClick} className="flex items-center">
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back to chats
-                  </Button>
-                </div>
-              )}
-              <div className="flex-1 flex flex-col h-full">
-                <ChatArea userId={userId} chatId={selectedChat} />
-              </div>
-            </>
+            <div className="flex-1 flex flex-col h-full">
+              <ChatArea userId={userId} chatId={selectedChat} onBack={handleBackClick} />
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
               <div className="text-center p-8">

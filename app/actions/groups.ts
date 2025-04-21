@@ -73,6 +73,113 @@ export async function createGroup({
   }
 }
 
+export async function createGroupWithLocation({
+  userId,
+  name,
+  description,
+  participants,
+  location,
+}: {
+  userId: string
+  name: string
+  description?: string
+  participants: string[]
+  location?: { latitude: number; longitude: number } | null
+}) {
+  try {
+    await connectToDatabase()
+
+    // Ensure the creator is included in participants
+    if (!participants.includes(userId)) {
+      participants.push(userId)
+    }
+
+    // Create new group chat
+    const newGroup = new Chat({
+      isGroup: true,
+      name,
+      description: description || null,
+      participants: participants.map((id) => new mongoose.Types.ObjectId(id)),
+      admins: [new mongoose.Types.ObjectId(userId)], // Creator is the admin
+      messages: [],
+    })
+
+    // Add location if provided
+    if (location) {
+      newGroup.location = {
+        type: "Point",
+        coordinates: [location.longitude, location.latitude], // MongoDB uses [longitude, latitude]
+        lastUpdated: new Date(),
+      }
+    }
+
+    await newGroup.save()
+
+    return {
+      success: true,
+      chatId: newGroup._id.toString(),
+    }
+  } catch (error) {
+    console.error("Error creating group:", error)
+    return {
+      success: false,
+      error: "Failed to create group",
+    }
+  }
+}
+
+export async function getNearbyGroups({
+  userId,
+  distance = 1000,
+}: {
+  userId: string
+  distance?: number
+}) {
+  try {
+    await connectToDatabase()
+
+    // Get the user's location
+    const user = await User.findById(userId)
+
+    if (!user?.location?.coordinates || (user.location.coordinates[0] === 0 && user.location.coordinates[1] === 0)) {
+      return []
+    }
+
+    // Find nearby groups
+    const nearbyGroups = await Chat.aggregate([
+      {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: user.location.coordinates,
+          },
+          distanceField: "distance",
+          maxDistance: distance, // in meters
+          spherical: true,
+          query: { isGroup: true }, // Only find groups
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          description: 1,
+          distance: 1,
+          participantsCount: { $size: "$participants" },
+        },
+      },
+      {
+        $limit: 20,
+      },
+    ])
+
+    return nearbyGroups
+  } catch (error) {
+    console.error("Error finding nearby groups:", error)
+    return []
+  }
+}
+
 export async function addGroupMembers({
   userId,
   chatId,

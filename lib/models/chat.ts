@@ -57,8 +57,26 @@ const ChatSchema = new mongoose.Schema(
       },
     ],
     messages: [MessageSchema],
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0],
+      },
+      lastUpdated: {
+        type: Date,
+        default: null,
+      },
+    },
   },
   { timestamps: true },
 )
+
+// Add geospatial index for location-based queries
+ChatSchema.index({ location: "2dsphere" })
 
 export const Chat = mongoose.models.Chat || mongoose.model("Chat", ChatSchema)

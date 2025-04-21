@@ -2,12 +2,14 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, Users, Search, X, Check, ImageIcon } from "lucide-react"
-import { searchUsers, createGroup } from "@/app/actions/groups"
+import { Switch } from "@/components/ui/switch"
+import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin } from "lucide-react"
+import { searchUsers } from "@/app/actions/groups"
+import { createGroupWithLocation } from "@/app/actions/groups"
 
 interface CreateGroupProps {
   userId: string
@@ -25,6 +27,19 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
   const [groupName, setGroupName] = useState("")
   const [groupDescription, setGroupDescription] = useState("")
   const [creating, setCreating] = useState(false)
+  const [enableLocation, setEnableLocation] = useState(false)
+  const [locationAvailable, setLocationAvailable] = useState(false)
+
+  useEffect(() => {
+    // Check if location is available
+    if (navigator.geolocation) {
+      navigator.permissions.query({ name: "geolocation" }).then((result) => {
+        if (result.state === "granted") {
+          setLocationAvailable(true)
+        }
+      })
+    }
+  }, [])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,11 +83,36 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
     setCreating(true)
     try {
       const participantIds = selectedUsers.map((user) => user._id)
-      const result = await createGroup({
+
+      let location = null
+
+      // If location is enabled, get current coordinates
+      if (enableLocation && locationAvailable) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            })
+          })
+
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }
+        } catch (error) {
+          console.error("Error getting location:", error)
+          // Continue without location if there's an error
+        }
+      }
+
+      const result = await createGroupWithLocation({
         userId,
         name: groupName.trim(),
         description: groupDescription.trim(),
         participants: participantIds,
+        location: location,
       })
 
       if (result.success && result.chatId) {
@@ -217,6 +257,16 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
                   placeholder="Enter group description"
                 />
               </div>
+
+              {locationAvailable && (
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Enable Location for Nearby Discovery</span>
+                  </div>
+                  <Switch checked={enableLocation} onCheckedChange={setEnableLocation} aria-label="Enable location" />
+                </div>
+              )}
 
               <div>
                 <div className="text-sm font-medium mb-2">Participants ({selectedUsers.length})</div>

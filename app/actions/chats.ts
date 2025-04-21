@@ -17,22 +17,39 @@ export async function getUserChats({ userId }: { userId: string }) {
     // Get the last message and other user for each chat
     const chatData = await Promise.all(
       chats.map(async (chat) => {
-        // Find the other user in the chat
-        const otherUserId = chat.participants.find((p) => p.toString() !== userId)
+        // Check if it's a group chat
+        if (chat.isGroup) {
+          // For group chats, return the group name and info
+          return {
+            _id: chat._id,
+            isGroup: true,
+            name: chat.name,
+            description: chat.description,
+            lastMessage: chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null,
+            unreadCount: chat.messages.filter((m) => m.sender.toString() !== userId && !m.read).length,
+          }
+        } else {
+          // For direct chats, find the other user
+          const otherUserId = chat.participants.find((p) => p.toString() !== userId)
+          let otherUser = null
 
-        const otherUser = await User.findById(otherUserId).select("_id username")
+          if (otherUserId) {
+            otherUser = await User.findById(otherUserId).select("_id username")
+          }
 
-        // Get the last message
-        const lastMessage = chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null
+          // Get the last message
+          const lastMessage = chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null
 
-        // Count unread messages
-        const unreadCount = chat.messages.filter((m) => m.sender.toString() !== userId && !m.read).length
+          // Count unread messages
+          const unreadCount = chat.messages.filter((m) => m.sender.toString() !== userId && !m.read).length
 
-        return {
-          _id: chat._id,
-          otherUser,
-          lastMessage,
-          unreadCount,
+          return {
+            _id: chat._id,
+            isGroup: false,
+            otherUser,
+            lastMessage,
+            unreadCount,
+          }
         }
       }),
     )
@@ -88,14 +105,49 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
       return { messages: [], otherUser: null }
     }
 
-    // Find the other user in the chat
-    const otherUserId = chat.participants.find((p) => p.toString() !== userId)
+    // Check if it's a group chat
+    if (chat.isGroup) {
+      // For group chats, get all participants' info for displaying names
+      const participantsInfo = await User.find({
+        _id: { $in: chat.participants },
+      }).select("_id username")
 
-    const otherUser = await User.findById(otherUserId).select("_id username")
+      // Create a map of user IDs to usernames
+      const userMap = new Map()
+      participantsInfo.forEach((user) => {
+        userMap.set(user._id.toString(), user.username)
+      })
 
-    return {
-      messages: chat.messages || [],
-      otherUser,
+      // Add sender names to messages
+      const messagesWithSenderNames = chat.messages.map((msg) => {
+        const message = msg.toObject ? msg.toObject() : msg
+        // If the sender is the current user, set senderName to "You"
+        if (message.sender.toString() === userId) {
+          message.senderName = "You"
+        } else {
+          message.senderName = userMap.get(message.sender.toString()) || "Unknown User"
+        }
+        return message
+      })
+
+      return {
+        messages: messagesWithSenderNames,
+        isGroup: true,
+        name: chat.name,
+        description: chat.description,
+        participants: participantsInfo,
+        admins: chat.admins,
+      }
+    } else {
+      // For direct chats, find the other user
+      const otherUserId = chat.participants.find((p) => p.toString() !== userId)
+      const otherUser = await User.findById(otherUserId).select("_id username")
+
+      return {
+        messages: chat.messages || [],
+        otherUser,
+        isGroup: false,
+      }
     }
   } catch (error) {
     console.error("Error getting chat messages:", error)

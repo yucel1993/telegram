@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { getUserChats } from "@/app/actions/chats"
+import { Users } from "lucide-react"
 
 interface UserChatListProps {
   userId: string
@@ -70,7 +71,14 @@ export default function UserChatList({ userId, onSelectChat, selectedChatId }: U
         >
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-medium">{chat.otherUser.username}</h3>
+              {chat.isGroup ? (
+                <div className="flex items-center">
+                  <Users className="h-4 w-4 mr-1 text-gray-500" />
+                  <h3 className="font-medium">{chat.name || "Group Chat"}</h3>
+                </div>
+              ) : (
+                <h3 className="font-medium">{chat.otherUser?.username || "Unknown User"}</h3>
+              )}
               <p className="text-sm text-gray-500 truncate">
                 {chat.lastMessage ? chat.lastMessage.content : "No messages yet"}
               </p>
