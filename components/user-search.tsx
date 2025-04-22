@@ -66,7 +66,8 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
     }
   }
 
-  const handleJoinGroup = async (groupId: string) => {
+  const handleJoinGroup = async (e: React.MouseEvent, groupId: string) => {
+    e.stopPropagation() // Prevent the box click event from firing
     try {
       setJoiningGroup((prev) => ({ ...prev, [groupId]: true }))
 
@@ -85,6 +86,11 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
     } finally {
       setJoiningGroup((prev) => ({ ...prev, [groupId]: false }))
     }
+  }
+
+  const handleGroupBoxClick = (groupId: string) => {
+    // Simply navigate to the group chat without joining
+    onSelectUser(groupId)
   }
 
   const hasResults = searchResults.users.length > 0 || searchResults.groups.length > 0
@@ -148,7 +154,11 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Groups</h3>
                 <div className="space-y-2">
                   {searchResults.groups.map((group) => (
-                    <div key={group._id} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
+                    <div
+                      key={group._id}
+                      className="p-3 bg-gray-50 rounded-md flex justify-between items-center cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleGroupBoxClick(group._id)}
+                    >
                       <div>
                         <div className="font-medium flex items-center">
                           <Users className="h-4 w-4 mr-1 text-gray-500" />
@@ -164,7 +174,7 @@ export default function UserSearch({ userId, onSelectUser }: UserSearchProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleJoinGroup(group._id)}
+                        onClick={(e) => handleJoinGroup(e, group._id)}
                         disabled={joiningGroup[group._id]}
                       >
                         <Users className="h-4 w-4 mr-1" />
