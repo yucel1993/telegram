@@ -207,7 +207,7 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
                             <div key={index} className="p-2 bg-gray-50 rounded-md">
                               <div className="font-medium">{participant.name}</div>
                               <div className="text-gray-500">{participant.email}</div>
-                              <div className="text-gray-500">Username: {participant.username || "Not provided"}</div>
+                              {/* <div className="text-gray-500">Username: {participant.username || "Not provided"}</div> */}
                               <div className="text-xs text-gray-400">
                                 Registered {format(new Date(participant.registeredAt), "MMM d, yyyy")}
                               </div>
