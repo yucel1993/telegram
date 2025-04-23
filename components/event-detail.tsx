@@ -97,7 +97,12 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6">
+    <div className="max-w-4xl mx-auto p-4 md:p-6"
+    style={isMobile ? { 
+      height: 'calc(100vh - 60px)', 
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch' // for smooth scrolling on iOS
+    } : {}}>
       <Button variant="ghost" onClick={() => router.push("/events")} className="mb-4">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Events
