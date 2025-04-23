@@ -37,6 +37,18 @@ const UserSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    registeredEvents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event",
+      },
+    ],
+    adminEvents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Event",
+      },
+    ],
   },
   { timestamps: true },
 )

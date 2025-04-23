@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus } from "lucide-react"
+import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus, Calendar } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { updateUserLocation, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
@@ -156,6 +156,10 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setShowNearbyUsers(false)
   }
 
+  const handleEventsClick = () => {
+    router.push("/events")
+  }
+
   // Determine what to show based on mobile/desktop and selected state
   const showSidebar = !isMobile || (isMobile && !selectedChat)
   const showChatArea = !isMobile || (isMobile && selectedChat)
@@ -170,6 +174,17 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               <h2 className="text-xl font-bold">ChatApp</h2>
               <Button variant="ghost" size="icon" onClick={handleLogout}>
                 <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex space-x-2 mb-4">
+              <Button variant="default" className="flex-1">
+                Chats
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={handleEventsClick}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Events
               </Button>
             </div>
 

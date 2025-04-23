@@ -8,7 +8,12 @@ export function middleware(request: NextRequest) {
   }
 
   // Check for authentication on protected routes
-  if (request.nextUrl.pathname.startsWith("/chat") && !request.cookies.has("user_session")) {
+  if (
+    (request.nextUrl.pathname.startsWith("/chat") ||
+      request.nextUrl.pathname.startsWith("/events") ||
+      request.nextUrl.pathname.startsWith("/event")) &&
+    !request.cookies.has("user_session")
+  ) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
@@ -16,5 +21,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/api/socketio"],
+  matcher: ["/chat/:path*", "/events/:path*", "/event/:path*", "/api/socketio"],
 }
