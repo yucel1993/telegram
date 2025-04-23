@@ -25,9 +25,15 @@ export async function signup(formData: FormData) {
     })
 
     if (existingUser) {
+      if (existingUser.username === username) {
+        return {
+          success: false,
+          error: "Username already exists",
+        }
+      }
       return {
         success: false,
-        error: "Username or email already exists",
+        error: "Email already exists",
       }
     }
 
@@ -41,6 +47,8 @@ export async function signup(formData: FormData) {
       password: hashedPassword,
       location: null,
       lastActive: new Date(),
+      registeredEvents: [],
+      adminEvents: [],
     })
 
     await newUser.save()
@@ -134,5 +142,20 @@ export async function getCurrentUser() {
     return session
   } catch {
     return null
+  }
+}
+
+export async function checkUsernameAvailability(username: string) {
+  try {
+    await connectToDatabase()
+
+    const existingUser = await User.findOne({ username })
+
+    return {
+      available: !existingUser,
+    }
+  } catch (error) {
+    console.error("Error checking username:", error)
+    return { available: false, error: "Failed to check username availability" }
   }
 }

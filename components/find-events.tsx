@@ -5,10 +5,11 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Calendar, MapPin, Clock, Users, Search, Loader2, AlertCircle } from "lucide-react"
+import { Calendar, MapPin, Clock, Users, Search, Loader2, AlertCircle, Globe } from "lucide-react"
 import { findEventsByCity } from "@/app/actions/events"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface FindEventsProps {
   userId: string
@@ -21,6 +22,7 @@ export default function FindEvents({ userId }: FindEventsProps) {
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const isMobile = useMobile()
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +37,9 @@ export default function FindEvents({ userId }: FindEventsProps) {
 
     try {
       const results = await findEventsByCity({ city: city.trim(), userId })
-      setEvents(results)
+      // Filter to only show public events
+      const publicEvents = results.filter((event: any) => !event.isPrivate)
+      setEvents(publicEvents)
       setSearched(true)
     } catch (error) {
       console.error("Error searching events:", error)
@@ -50,14 +54,14 @@ export default function FindEvents({ userId }: FindEventsProps) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 md:p-6">
       <h1 className="text-2xl font-bold mb-6">Find Events</h1>
 
       <form onSubmit={handleSearch} className="mb-6">
         <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="city" className="text-sm font-medium">
-              Search events by city
+              Search public events by city
             </label>
             <div className="flex space-x-2">
               <Input
@@ -95,34 +99,40 @@ export default function FindEvents({ userId }: FindEventsProps) {
                 className="p-4 rounded-lg border bg-white cursor-pointer hover:bg-gray-50"
                 onClick={() => handleViewEvent(event._id)}
               >
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2">
                   <h3 className="font-medium text-lg">{event.name}</h3>
-                  {event.fee === null ? (
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Free</span>
-                  ) : (
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      ${event.fee.toFixed(2)}
+                  <div className="flex flex-wrap gap-2">
+                    {event.fee === null ? (
+                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Free</span>
+                    ) : (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        ${event.fee.toFixed(2)}
+                      </span>
+                    )}
+                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
+                      <Globe className="h-3 w-3 mr-1" />
+                      Public
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 <div className="mt-2 space-y-1 text-sm text-gray-600">
                   <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
+                    <Calendar className="h-4 w-4 mr-1 flex-shrink-0" />
                     <span>{format(new Date(event.dateTime), "EEEE, MMMM d, yyyy")}</span>
                   </div>
                   <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
+                    <Clock className="h-4 w-4 mr-1 flex-shrink-0" />
                     <span>{format(new Date(event.dateTime), "h:mm a")}</span>
                   </div>
                   <div className="flex items-start">
-                    <MapPin className="h-4 w-4 mr-1 mt-0.5" />
-                    <span className="line-clamp-1">
+                    <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                    <span className="line-clamp-1 break-words">
                       {event.address}, {event.city}
                     </span>
                   </div>
                   <div className="flex items-center">
-                    <Users className="h-4 w-4 mr-1" />
+                    <Users className="h-4 w-4 mr-1 flex-shrink-0" />
                     <span>
                       {event.participantCount} participants
                       {event.participantLimit > 0 && ` (Limit: ${event.participantLimit})`}
@@ -141,14 +151,14 @@ export default function FindEvents({ userId }: FindEventsProps) {
         ) : (
           <div className="text-center py-8 text-gray-500">
             <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-            <p>No events found in {city}</p>
+            <p>No public events found in {city}</p>
             <p className="text-sm mt-1">Try searching for a different city or create your own event</p>
           </div>
         )
       ) : (
         <div className="text-center py-8 text-gray-500">
           <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-          <p>Enter a city name to find events</p>
+          <p>Enter a city name to find public events</p>
         </div>
       )}
     </div>

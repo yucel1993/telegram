@@ -5,18 +5,21 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Calendar, Clock, MapPin, User, Users, ArrowLeft, Loader2, AlertCircle, Check } from "lucide-react"
+import { Calendar, Clock, MapPin, User, Users, ArrowLeft, Loader2, AlertCircle, Check, Globe, Lock } from "lucide-react"
 import { getEventDetails, registerForEvent } from "@/app/actions/events"
 import { format } from "date-fns"
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useRouter } from "next/navigation"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useMobile } from "@/hooks/use-mobile"
 
 interface EventDetailProps {
   userId: string
@@ -30,9 +33,11 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
   const [registering, setRegistering] = useState(false)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [registerSuccess, setRegisterSuccess] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const router = useRouter()
+  const isMobile = useMobile()
 
   useEffect(() => {
     fetchEventDetails()
@@ -68,6 +73,7 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
         eventId,
         name,
         email,
+        username,
       })
 
       if (result.success) {
@@ -86,8 +92,12 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
     }
   }
 
+  const handleReturnToEvents = () => {
+    router.push("/events")
+  }
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 md:p-6">
       <Button variant="ghost" onClick={() => router.push("/events")} className="mb-4">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Events
@@ -104,16 +114,35 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
         </div>
       ) : event ? (
         <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-start">
-              <h1 className="text-2xl font-bold text-gray-800">{event.name}</h1>
-              {event.fee === null ? (
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Free</span>
-              ) : (
-                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                  ${event.fee.toFixed(2)}
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-800">{event.name}</h1>
+              <div className="flex flex-wrap gap-2">
+                {event.fee === null ? (
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">Free</span>
+                ) : (
+                  <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                    ${event.fee.toFixed(2)}
+                  </span>
+                )}
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    event.isPrivate ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"
+                  }`}
+                >
+                  {event.isPrivate ? (
+                    <span className="flex items-center">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Private
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <Globe className="h-3 w-3 mr-1" />
+                      Public
+                    </span>
+                  )}
                 </span>
-              )}
+              </div>
             </div>
 
             {event.image && (
@@ -121,32 +150,32 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
                 <img
                   src={event.image || "/placeholder.svg"}
                   alt={event.name}
-                  className="rounded-md max-h-60 object-cover"
+                  className="rounded-md max-h-60 w-full object-cover"
                 />
               </div>
             )}
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center text-gray-600">
-                <Calendar className="h-5 w-5 mr-2" />
+                <Calendar className="h-5 w-5 mr-2 flex-shrink-0" />
                 <span>{format(new Date(event.dateTime), "EEEE, MMMM d, yyyy")}</span>
               </div>
               <div className="flex items-center text-gray-600">
-                <Clock className="h-5 w-5 mr-2" />
+                <Clock className="h-5 w-5 mr-2 flex-shrink-0" />
                 <span>{format(new Date(event.dateTime), "h:mm a")}</span>
               </div>
               <div className="flex items-start text-gray-600">
-                <MapPin className="h-5 w-5 mr-2 mt-0.5" />
-                <span>
+                <MapPin className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                <span className="break-words">
                   {event.address}, {event.city}
                 </span>
               </div>
               <div className="flex items-center text-gray-600">
-                <User className="h-5 w-5 mr-2" />
+                <User className="h-5 w-5 mr-2 flex-shrink-0" />
                 <span>Organized by {event.admin.username}</span>
               </div>
               <div className="flex items-center text-gray-600">
-                <Users className="h-5 w-5 mr-2" />
+                <Users className="h-5 w-5 mr-2 flex-shrink-0" />
                 <span>
                   {event.participantCount} participants
                   {event.participantLimit > 0 && ` (Limit: ${event.participantLimit})`}
@@ -173,6 +202,7 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
                             <div key={index} className="p-2 bg-gray-50 rounded-md">
                               <div className="font-medium">{participant.name}</div>
                               <div className="text-gray-500">{participant.email}</div>
+                              <div className="text-gray-500">Username: {participant.username || "Not provided"}</div>
                               <div className="text-xs text-gray-400">
                                 Registered {format(new Date(participant.registeredAt), "MMM d, yyyy")}
                               </div>
@@ -190,7 +220,7 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
           </div>
 
           {!event.isAdmin && !event.isRegistered && !registerSuccess ? (
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
               <h2 className="text-lg font-medium mb-4">Register for This Event</h2>
               {error && (
                 <div className="bg-red-50 p-3 rounded-md text-red-800 flex items-start mb-4">
@@ -215,6 +245,18 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
                       onChange={(e) => setName(e.target.value)}
                       required
                       placeholder="Enter your name"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                      Your Username
+                    </label>
+                    <Input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      placeholder="Enter your username"
                     />
                   </div>
                   <div>
@@ -253,6 +295,9 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
                     You have successfully registered for this event. The organizer will be notified of your
                     participation.
                   </p>
+                  <Button onClick={handleReturnToEvents} variant="outline" className="mt-4 bg-white">
+                    Return to Events Page
+                  </Button>
                 </div>
               </div>
             </div>
@@ -278,6 +323,9 @@ export default function EventDetail({ userId, eventId }: EventDetailProps) {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleReturnToEvents}>Return to Events Page</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

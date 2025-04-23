@@ -4,7 +4,21 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Calendar, MapPin, Clock, Users, Trash2, Edit, Loader2, AlertCircle, Eye } from "lucide-react"
+import {
+  Calendar,
+  MapPin,
+  Clock,
+  Users,
+  Trash2,
+  Edit,
+  Loader2,
+  AlertCircle,
+  Eye,
+  Copy,
+  Check,
+  Globe,
+  Lock,
+} from "lucide-react"
 import { getUserAdminEvents, deleteEvent } from "@/app/actions/events"
 import { format } from "date-fns"
 import {
@@ -18,6 +32,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useRouter } from "next/navigation"
+import { useMobile } from "@/hooks/use-mobile"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ManageEventsProps {
   userId: string
@@ -30,7 +46,9 @@ export default function ManageEvents({ userId }: ManageEventsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
   const router = useRouter()
+  const isMobile = useMobile()
 
   useEffect(() => {
     fetchAdminEvents()
@@ -88,11 +106,23 @@ export default function ManageEvents({ userId }: ManageEventsProps) {
 
   const handleEditEvent = (e: React.MouseEvent, eventId: string) => {
     e.stopPropagation() // Prevent event card click
-    router.push(`/event/edit/${eventId}`)
+    router.push(`/event/${eventId}/edit`)
+  }
+
+  const handleCopyLink = (e: React.MouseEvent, eventId: string) => {
+    e.stopPropagation() // Prevent event card click
+    const eventLink = `https://telegram-xi-eight.vercel.app/event/${eventId}`
+    navigator.clipboard.writeText(eventLink)
+
+    // Show copied indicator
+    setCopiedEventId(eventId)
+    setTimeout(() => {
+      setCopiedEventId(null)
+    }, 2000)
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 md:p-6">
       <h1 className="text-2xl font-bold mb-6">Manage Your Events</h1>
 
       {error && (
@@ -114,34 +144,53 @@ export default function ManageEvents({ userId }: ManageEventsProps) {
               className="p-4 rounded-lg border bg-white cursor-pointer hover:bg-gray-50"
               onClick={() => handleViewEvent(event._id)}
             >
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2">
                 <h3 className="font-medium text-lg">{event.name}</h3>
-                {event.fee === null ? (
-                  <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Free</span>
-                ) : (
-                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                    ${event.fee.toFixed(2)}
+                <div className="flex flex-wrap gap-2">
+                  {event.fee === null ? (
+                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Free</span>
+                  ) : (
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      ${event.fee.toFixed(2)}
+                    </span>
+                  )}
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full flex items-center ${
+                      event.isPrivate ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"
+                    }`}
+                  >
+                    {event.isPrivate ? (
+                      <>
+                        <Lock className="h-3 w-3 mr-1" />
+                        Private
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-3 w-3 mr-1" />
+                        Public
+                      </>
+                    )}
                   </span>
-                )}
+                </div>
               </div>
 
               <div className="mt-2 space-y-1 text-sm text-gray-600">
                 <div className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-1" />
+                  <Calendar className="h-4 w-4 mr-1 flex-shrink-0" />
                   <span>{format(new Date(event.dateTime), "EEEE, MMMM d, yyyy")}</span>
                 </div>
                 <div className="flex items-center">
-                  <Clock className="h-4 w-4 mr-1" />
+                  <Clock className="h-4 w-4 mr-1 flex-shrink-0" />
                   <span>{format(new Date(event.dateTime), "h:mm a")}</span>
                 </div>
                 <div className="flex items-start">
-                  <MapPin className="h-4 w-4 mr-1 mt-0.5" />
-                  <span className="line-clamp-1">
+                  <MapPin className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                  <span className="line-clamp-1 break-words">
                     {event.address}, {event.city}
                   </span>
                 </div>
                 <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-1" />
+                  <Users className="h-4 w-4 mr-1 flex-shrink-0" />
                   <span>
                     {event.participantCount} participants
                     {event.participantLimit > 0 && ` (Limit: ${event.participantLimit})`}
@@ -149,7 +198,7 @@ export default function ManageEvents({ userId }: ManageEventsProps) {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className={`mt-3 grid ${event.isPrivate ? "grid-cols-2 md:grid-cols-4" : "grid-cols-3"} gap-2`}>
                 <Button size="sm" variant="outline" className="flex items-center justify-center">
                   <Eye className="h-4 w-4 mr-1" />
                   View
@@ -163,6 +212,35 @@ export default function ManageEvents({ userId }: ManageEventsProps) {
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </Button>
+                {event.isPrivate && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex items-center justify-center"
+                          onClick={(e) => handleCopyLink(e, event._id)}
+                        >
+                          {copiedEventId === event._id ? (
+                            <>
+                              <Check className="h-4 w-4 mr-1 text-green-600" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-1" />
+                              Copy Link
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Copy link to share with others</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <Button
                   size="sm"
                   variant="outline"

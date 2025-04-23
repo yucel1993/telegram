@@ -1,174 +1,170 @@
 "use server"
 
 import { connectToDatabase } from "@/lib/mongodb"
-import { Event } from "@/lib/models/event"
 import { User } from "@/lib/models/user"
-import mongoose from "mongoose"
+import { Event } from "@/lib/models/event"
+import type mongoose from "mongoose"
 
 // Create a new event
-export async function createEvent({
-  userId,
-  name,
-  description,
-  city,
-  address,
-  dateTime,
-  fee,
-  participantLimit,
-  image,
-  isPrivate,
-}: {
+export async function createEvent(data: {
   userId: string
   name: string
-  description?: string
+  description: string
   city: string
   address: string
   dateTime: string
-  fee?: number | null
-  participantLimit?: number
+  fee: number | null
+  participantLimit: number
   image?: string
-  isPrivate?: boolean
+  isPrivate: boolean
 }) {
   try {
     await connectToDatabase()
 
+    const user = await User.findById(data.userId)
+    if (!user) {
+      return { success: false, error: "User not found" }
+    }
+
     const newEvent = new Event({
-      name,
-      description: description || "",
-      city: city.toLowerCase(),
-      address,
-      dateTime: new Date(dateTime),
-      fee: fee === undefined ? null : fee,
-      participantLimit: participantLimit || 0,
-      image: image || null,
-      isPrivate: isPrivate || false,
-      admin: new mongoose.Types.ObjectId(userId),
+      name: data.name,
+      description: data.description,
+      city: data.city,
+      address: data.address,
+      dateTime: new Date(data.dateTime),
+      fee: data.fee,
+      participantLimit: data.participantLimit,
+      image: data.image || null,
+      isPrivate: data.isPrivate,
+      admin: data.userId,
       registeredUsers: [],
     })
 
     await newEvent.save()
 
     // Add event to user's adminEvents
-    await User.findByIdAndUpdate(userId, {
-      $push: { adminEvents: newEvent._id },
-    })
+    user.adminEvents.push(newEvent._id)
+    await user.save()
 
-    return { success: true, eventId: newEvent._id.toString() }
+    return { success: true, eventId: newEvent._id }
   } catch (error) {
-    console.error("Error creating event:", error)
+    console.error("Create event error:", error)
     return { success: false, error: "Failed to create event" }
   }
 }
 
 // Find events by city
-export async function findEventsByCity({
-  city,
-  userId,
-}: {
-  city: string
-  userId: string
-}) {
+export async function findEventsByCity(data: { city: string; userId: string }) {
   try {
     await connectToDatabase()
 
-    // Find public events in the specified city
     const events = await Event.find({
-      city: city.toLowerCase(),
-      isPrivate: false,
-      dateTime: { $gte: new Date() }, // Only show upcoming events
-    })
-      .select("_id name description dateTime fee participantLimit registeredUsers admin")
-      .sort({ dateTime: 1 }) // Sort by date, upcoming first
-      .populate("admin", "username")
+      city: { $regex: new RegExp(data.city, "i") },
+    }).populate("admin", "username")
 
-    // Format events with additional info
-    const formattedEvents = events.map((event) => {
-      const isAdmin = event.admin._id.toString() === userId
-      const isRegistered = event.registeredUsers.some((user: any) => user.userId.toString() === userId)
-      const isFull = event.participantLimit > 0 && event.registeredUsers.length >= event.participantLimit
+    // Transform events to include participant count and check if user is registered
+    const transformedEvents = await Promise.all(
+      events.map(async (event) => {
+        const isRegistered = event.registeredUsers.some(
+          (registration: any) => registration.userId.toString() === data.userId,
+        )
 
-      return {
-        ...event.toObject(),
-        isAdmin,
-        isRegistered,
-        isFull,
-        participantCount: event.registeredUsers.length,
-      }
-    })
+        return {
+          _id: event._id,
+          name: event.name,
+          description: event.description,
+          city: event.city,
+          address: event.address,
+          dateTime: event.dateTime,
+          fee: event.fee,
+          participantLimit: event.participantLimit,
+          image: event.image,
+          isPrivate: event.isPrivate,
+          admin: event.admin,
+          participantCount: event.registeredUsers.length,
+          isRegistered,
+        }
+      }),
+    )
 
-    return formattedEvents
+    return transformedEvents
   } catch (error) {
-    console.error("Error finding events by city:", error)
-    return []
+    console.error("Find events error:", error)
+    throw new Error("Failed to find events")
   }
 }
 
 // Get event details
-export async function getEventDetails({
-  eventId,
-  userId,
-}: {
-  eventId: string
-  userId: string
-}) {
+export async function getEventDetails(data: { eventId: string; userId: string }) {
   try {
     await connectToDatabase()
 
-    const event = await Event.findById(eventId).populate("admin", "username")
+    const event = await Event.findById(data.eventId).populate("admin", "username")
 
     if (!event) {
       return { success: false, error: "Event not found" }
     }
 
-    // Check if user is admin or if event is public
-    const isAdmin = event.admin._id.toString() === userId
-    const isRegistered = event.registeredUsers.some((user: any) => user.userId.toString() === userId)
+    const isAdmin = event.admin._id.toString() === data.userId
+    const isRegistered = event.registeredUsers.some(
+      (registration: any) => registration.userId.toString() === data.userId,
+    )
     const isFull = event.participantLimit > 0 && event.registeredUsers.length >= event.participantLimit
-
-    // If event is private and user is not admin or registered, deny access
-    if (event.isPrivate && !isAdmin && !isRegistered) {
-      return { success: false, error: "You don't have permission to view this event" }
-    }
 
     return {
       success: true,
       event: {
-        ...event.toObject(),
+        _id: event._id,
+        name: event.name,
+        description: event.description,
+        city: event.city,
+        address: event.address,
+        dateTime: event.dateTime,
+        fee: event.fee,
+        participantLimit: event.participantLimit,
+        image: event.image,
+        isPrivate: event.isPrivate,
+        admin: event.admin,
+        registeredUsers: isAdmin ? event.registeredUsers : [],
+        participantCount: event.registeredUsers.length,
         isAdmin,
         isRegistered,
         isFull,
-        participantCount: event.registeredUsers.length,
       },
     }
   } catch (error) {
-    console.error("Error getting event details:", error)
+    console.error("Get event details error:", error)
     return { success: false, error: "Failed to get event details" }
   }
 }
 
 // Register for an event
-export async function registerForEvent({
-  userId,
-  eventId,
-  name,
-  email,
-}: {
+export async function registerForEvent(data: {
   userId: string
   eventId: string
   name: string
   email: string
+  username: string
 }) {
   try {
     await connectToDatabase()
 
-    const event = await Event.findById(eventId)
+    const user = await User.findById(data.userId)
+    if (!user) {
+      return { success: false, error: "User not found" }
+    }
 
+    const event = await Event.findById(data.eventId)
     if (!event) {
       return { success: false, error: "Event not found" }
     }
 
     // Check if user is already registered
-    if (event.registeredUsers.some((user: any) => user.userId.toString() === userId)) {
+    const isRegistered = event.registeredUsers.some(
+      (registration: any) => registration.userId.toString() === data.userId,
+    )
+
+    if (isRegistered) {
       return { success: false, error: "You are already registered for this event" }
     }
 
@@ -178,208 +174,221 @@ export async function registerForEvent({
     }
 
     // Add user to event's registeredUsers
-    await Event.findByIdAndUpdate(eventId, {
-      $push: {
-        registeredUsers: {
-          userId: new mongoose.Types.ObjectId(userId),
-          name,
-          email,
-          registeredAt: new Date(),
-        },
-      },
+    event.registeredUsers.push({
+      userId: data.userId,
+      name: data.name,
+      email: data.email,
+      username: data.username,
+      registeredAt: new Date(),
     })
 
+    await event.save()
+
     // Add event to user's registeredEvents
-    await User.findByIdAndUpdate(userId, {
-      $push: { registeredEvents: new mongoose.Types.ObjectId(eventId) },
-    })
+    user.registeredEvents.push(event._id)
+    await user.save()
 
     return { success: true }
   } catch (error) {
-    console.error("Error registering for event:", error)
+    console.error("Register for event error:", error)
     return { success: false, error: "Failed to register for event" }
   }
 }
 
 // Unregister from an event
-export async function unregisterFromEvent({
-  userId,
-  eventId,
-}: {
-  userId: string
-  eventId: string
-}) {
+export async function unregisterFromEvent(data: { userId: string; eventId: string }) {
   try {
     await connectToDatabase()
 
+    const user = await User.findById(data.userId)
+    if (!user) {
+      return { success: false, error: "User not found" }
+    }
+
+    const event = await Event.findById(data.eventId)
+    if (!event) {
+      return { success: false, error: "Event not found" }
+    }
+
     // Remove user from event's registeredUsers
-    await Event.findByIdAndUpdate(eventId, {
-      $pull: {
-        registeredUsers: { userId: new mongoose.Types.ObjectId(userId) },
-      },
-    })
+    event.registeredUsers = event.registeredUsers.filter(
+      (registration: any) => registration.userId.toString() !== data.userId,
+    )
+
+    await event.save()
 
     // Remove event from user's registeredEvents
-    await User.findByIdAndUpdate(userId, {
-      $pull: { registeredEvents: new mongoose.Types.ObjectId(eventId) },
-    })
+    user.registeredEvents = user.registeredEvents.filter(
+      (eventId: mongoose.Types.ObjectId) => eventId.toString() !== data.eventId,
+    )
+    await user.save()
 
     return { success: true }
   } catch (error) {
-    console.error("Error unregistering from event:", error)
+    console.error("Unregister from event error:", error)
     return { success: false, error: "Failed to unregister from event" }
   }
 }
 
 // Get user's registered events
-export async function getUserRegisteredEvents({ userId }: { userId: string }) {
+export async function getUserRegisteredEvents(data: { userId: string }) {
   try {
     await connectToDatabase()
 
-    // Find events where the user is registered
-    const events = await Event.find({
-      "registeredUsers.userId": new mongoose.Types.ObjectId(userId),
+    const user = await User.findById(data.userId).populate({
+      path: "registeredEvents",
+      populate: {
+        path: "admin",
+        select: "username",
+      },
     })
-      .select("_id name description dateTime fee address city registeredUsers admin")
-      .sort({ dateTime: 1 })
-      .populate("admin", "username")
 
-    return events.map((event) => ({
-      ...event.toObject(),
+    if (!user) {
+      return []
+    }
+
+    // Transform events to include participant count
+    const transformedEvents = user.registeredEvents.map((event: any) => ({
+      _id: event._id,
+      name: event.name,
+      description: event.description,
+      city: event.city,
+      address: event.address,
+      dateTime: event.dateTime,
+      fee: event.fee,
+      participantLimit: event.participantLimit,
+      image: event.image,
+      isPrivate: event.isPrivate,
+      admin: event.admin,
       participantCount: event.registeredUsers.length,
-      adminName: event.admin.username,
     }))
+
+    return transformedEvents
   } catch (error) {
-    console.error("Error getting user registered events:", error)
-    return []
+    console.error("Get user registered events error:", error)
+    throw new Error("Failed to get registered events")
   }
 }
 
 // Get user's admin events
-export async function getUserAdminEvents({ userId }: { userId: string }) {
+export async function getUserAdminEvents(data: { userId: string }) {
   try {
     await connectToDatabase()
 
-    // Find events where the user is the admin
-    const events = await Event.find({
-      admin: new mongoose.Types.ObjectId(userId),
+    const user = await User.findById(data.userId).populate({
+      path: "adminEvents",
+      populate: {
+        path: "admin",
+        select: "username",
+      },
     })
-      .select("_id name description dateTime fee address city registeredUsers")
-      .sort({ dateTime: 1 })
 
-    return events.map((event) => ({
-      ...event.toObject(),
+    if (!user) {
+      return []
+    }
+
+    // Transform events to include participant count
+    const transformedEvents = user.adminEvents.map((event: any) => ({
+      _id: event._id,
+      name: event.name,
+      description: event.description,
+      city: event.city,
+      address: event.address,
+      dateTime: event.dateTime,
+      fee: event.fee,
+      participantLimit: event.participantLimit,
+      image: event.image,
+      isPrivate: event.isPrivate,
+      admin: event.admin,
       participantCount: event.registeredUsers.length,
     }))
+
+    return transformedEvents
   } catch (error) {
-    console.error("Error getting user admin events:", error)
-    return []
+    console.error("Get user admin events error:", error)
+    throw new Error("Failed to get admin events")
   }
 }
 
 // Update an event
-export async function updateEvent({
-  userId,
-  eventId,
-  name,
-  description,
-  city,
-  address,
-  dateTime,
-  fee,
-  participantLimit,
-  image,
-  isPrivate,
-}: {
+export async function updateEvent(data: {
   userId: string
   eventId: string
-  name?: string
-  description?: string
-  city?: string
-  address?: string
-  dateTime?: string
-  fee?: number | null
-  participantLimit?: number
+  name: string
+  description: string
+  city: string
+  address: string
+  dateTime: string
+  fee: number | null
+  participantLimit: number
   image?: string
-  isPrivate?: boolean
+  isPrivate: boolean
 }) {
   try {
     await connectToDatabase()
 
-    // Check if user is the admin of the event
-    const event = await Event.findById(eventId)
-
+    const event = await Event.findById(data.eventId)
     if (!event) {
       return { success: false, error: "Event not found" }
     }
 
-    if (event.admin.toString() !== userId) {
-      return { success: false, error: "You don't have permission to update this event" }
+    // Check if user is the admin of the event
+    if (event.admin.toString() !== data.userId) {
+      return { success: false, error: "You are not authorized to update this event" }
     }
 
-    // Update event fields
-    const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (description !== undefined) updateData.description = description
-    if (city !== undefined) updateData.city = city.toLowerCase()
-    if (address !== undefined) updateData.address = address
-    if (dateTime !== undefined) updateData.dateTime = new Date(dateTime)
-    if (fee !== undefined) updateData.fee = fee
-    if (participantLimit !== undefined) updateData.participantLimit = participantLimit
-    if (image !== undefined) updateData.image = image
-    if (isPrivate !== undefined) updateData.isPrivate = isPrivate
+    // Update event
+    event.name = data.name
+    event.description = data.description
+    event.city = data.city
+    event.address = data.address
+    event.dateTime = new Date(data.dateTime)
+    event.fee = data.fee
+    event.participantLimit = data.participantLimit
+    if (data.image) {
+      event.image = data.image
+    }
+    event.isPrivate = data.isPrivate
 
-    await Event.findByIdAndUpdate(eventId, { $set: updateData })
+    await event.save()
 
     return { success: true }
   } catch (error) {
-    console.error("Error updating event:", error)
+    console.error("Update event error:", error)
     return { success: false, error: "Failed to update event" }
   }
 }
 
 // Delete an event
-export async function deleteEvent({
-  userId,
-  eventId,
-}: {
-  userId: string
-  eventId: string
-}) {
+export async function deleteEvent(data: { userId: string; eventId: string }) {
   try {
     await connectToDatabase()
 
-    // Check if user is the admin of the event
-    const event = await Event.findById(eventId)
-
+    const event = await Event.findById(data.eventId)
     if (!event) {
       return { success: false, error: "Event not found" }
     }
 
-    if (event.admin.toString() !== userId) {
-      return { success: false, error: "You don't have permission to delete this event" }
+    // Check if user is the admin of the event
+    if (event.admin.toString() !== data.userId) {
+      return { success: false, error: "You are not authorized to delete this event" }
     }
 
     // Get all registered users
-    const registeredUserIds = event.registeredUsers.map((user: any) => user.userId)
+    const registeredUserIds = event.registeredUsers.map((registration: any) => registration.userId)
 
     // Remove event from all registered users' registeredEvents
-    await User.updateMany(
-      { _id: { $in: registeredUserIds } },
-      { $pull: { registeredEvents: new mongoose.Types.ObjectId(eventId) } },
-    )
+    await User.updateMany({ _id: { $in: registeredUserIds } }, { $pull: { registeredEvents: data.eventId } })
 
     // Remove event from admin's adminEvents
-    await User.findByIdAndUpdate(userId, {
-      $pull: { adminEvents: new mongoose.Types.ObjectId(eventId) },
-    })
+    await User.updateOne({ _id: data.userId }, { $pull: { adminEvents: data.eventId } })
 
-    // Delete the event
-    await Event.findByIdAndDelete(eventId)
+    // Delete event
+    await Event.findByIdAndDelete(data.eventId)
 
     return { success: true }
   } catch (error) {
-    console.error("Error deleting event:", error)
+    console.error("Delete event error:", error)
     return { success: false, error: "Failed to delete event" }
   }
 }
