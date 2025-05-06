@@ -20,6 +20,8 @@ import {
 import { getChatMessages, sendMessage, markMessagesAsRead, deleteChat } from "@/app/actions/chats"
 import { joinGroup } from "@/app/actions/groups"
 import { useMobile } from "@/hooks/use-mobile"
+import FileUploadButton from "@/components/file-upload-button"
+import FilePreview from "@/components/file-preview"
 
 interface ChatAreaProps {
   userId: string
@@ -45,6 +47,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showLeaveDialog, setShowLeaveDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [fileAttachment, setFileAttachment] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -172,7 +176,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!messageText.trim() || sending) return
+    if ((!messageText.trim() && !fileAttachment) || sending) return
 
     try {
       setSending(true)
@@ -181,15 +185,17 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const optimisticMessage = {
         _id: Date.now().toString(),
         sender: userId,
-        content: messageText,
+        content: messageText || "Sent a file",
         read: false,
         createdAt: new Date().toISOString(),
         optimistic: true,
         senderName: "You", // For group chats
+        fileAttachment: fileAttachment,
       }
 
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
+      setFileAttachment(null)
 
       // Enable auto-scroll when sending a message
       setAutoScroll(true)
@@ -208,7 +214,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const result = await sendMessage({
         userId,
         chatId,
-        content: messageText.trim(),
+        content: messageText.trim() || "Sent a file",
+        fileAttachment: fileAttachment,
       })
 
       if (!result.success) {
@@ -280,6 +287,21 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       setShowDeleteDialog(false)
       setShowLeaveDialog(false)
     }
+  }
+
+  const handleFileUploaded = (fileData: any) => {
+    setFileAttachment(fileData)
+    setUploadingFile(false)
+    // Auto-send the message with the file
+    if (!messageText.trim()) {
+      // If no text, set a default message
+      setMessageText("Sent a file")
+    }
+  }
+
+  const handleCancelUpload = () => {
+    setUploadingFile(false)
+    setFileAttachment(null)
   }
 
   if (loading) {
@@ -383,7 +405,19 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                         {message.senderName || "Unknown User"}
                       </div>
                     )}
+
+                    {/* Message content */}
                     <p className="break-words">{message.content}</p>
+
+                    {/* File attachment if present */}
+                    {message.fileAttachment && (
+                      <div
+                        className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
+                      >
+                        <FilePreview fileAttachment={message.fileAttachment} />
+                      </div>
+                    )}
+
                     <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
                       {new Date(message.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -420,13 +454,20 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           </Button>
         ) : (
           <form onSubmit={handleSendMessage} className="flex space-x-2">
+            {/* File upload button */}
+            <FileUploadButton
+              onFileUploaded={handleFileUploaded}
+              onCancel={handleCancelUpload}
+              isUploading={uploadingFile}
+            />
+
             <Input
               ref={inputRef}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Type a message..."
+              placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
               className="flex-1"
-              disabled={sending}
+              disabled={sending || !!fileAttachment}
               onFocus={() => {
                 // On mobile, wait a bit for the keyboard to appear, then scroll
                 setTimeout(() => {
@@ -436,7 +477,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 }, 300)
               }}
             />
-            <Button type="submit" disabled={!messageText.trim() || sending}>
+
+            <Button type="submit" disabled={(!messageText.trim() && !fileAttachment) || sending}>
               <Send className="h-4 w-4" />
             </Button>
           </form>

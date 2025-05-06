@@ -199,10 +199,19 @@ export async function sendMessage({
   userId,
   chatId,
   content,
+  fileAttachment,
 }: {
   userId: string
   chatId: string
   content: string
+  fileAttachment?: {
+    filename: string
+    originalFilename: string
+    mimeType: string
+    size: number
+    s3Key: string
+    fileType: string
+  } | null
 }) {
   try {
     await connectToDatabase()
@@ -253,6 +262,7 @@ export async function sendMessage({
       read: false,
       createdAt: new Date(),
       updatedAt: new Date(),
+      fileAttachment: fileAttachment || null,
     }
 
     chat.messages.push(newMessage)

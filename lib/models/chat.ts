@@ -25,6 +25,20 @@ const MessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    fileAttachment: {
+      type: {
+        filename: String,
+        originalFilename: String,
+        mimeType: String,
+        size: Number,
+        s3Key: String,
+        fileType: {
+          type: String,
+          enum: ["audio", "video", "document", "image", "other"],
+        },
+      },
+      default: null,
+    },
   },
   { timestamps: true },
 )
