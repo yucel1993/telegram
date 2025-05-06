@@ -185,7 +185,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const optimisticMessage = {
         _id: Date.now().toString(),
         sender: userId,
-        content: messageText || "", // Empty string instead of "Sent a file"
+        content: messageText || "", // Empty string if no text
         read: false,
         createdAt: new Date().toISOString(),
         optimistic: true,
@@ -195,7 +195,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
-      setFileAttachment(null) // Clear file attachment immediately
+      // Don't clear the file attachment yet
 
       // Enable auto-scroll when sending a message
       setAutoScroll(true)
@@ -214,7 +214,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const result = await sendMessage({
         userId,
         chatId,
-        content: messageText.trim() || "", // Empty string instead of "Sent a file"
+        content: messageText.trim(), // Just send the actual text
         fileAttachment: fileAttachment,
       })
 
@@ -229,6 +229,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           setMessages(data.messages)
           lastMessageCountRef.current = data.messages.length
         }
+        // Add this line to clear the file attachment after successful sending
+        setFileAttachment(null)
       }
     } catch (error) {
       console.error("Error sending message:", error)
@@ -292,11 +294,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const handleFileUploaded = (fileData: any) => {
     setFileAttachment(fileData)
     setUploadingFile(false)
-    // Auto-send the message with the file
-    if (!messageText.trim()) {
-      // If no text, set a default message
-      setMessageText("Sent a file")
-    }
+    // Don't set default message text anymore
   }
 
   const handleCancelUpload = () => {
@@ -407,7 +405,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                     )}
 
                     {/* Message content */}
-                    <p className="break-words">{message.content}</p>
+                    {message.content && <p className="break-words">{message.content}</p>}
 
                     {/* File attachment if present */}
                     {message.fileAttachment && (

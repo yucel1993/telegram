@@ -16,9 +16,10 @@ interface FileUploadButtonProps {
 export default function FileUploadButton({ onFileUploaded, onCancel, isUploading }: FileUploadButtonProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
 
@@ -34,16 +35,21 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
       }
 
       setSelectedFile(file)
+
+      // Auto-upload immediately after selection
+      await handleUpload(file)
     }
   }
 
-  const handleUpload = async () => {
-    if (!selectedFile) return
+  const handleUpload = async (file: File) => {
+    if (!file) return
 
     try {
+      setUploading(true)
+
       // Create form data
       const formData = new FormData()
-      formData.append("file", selectedFile)
+      formData.append("file", file)
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
@@ -61,9 +67,7 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
 
       if (result.success) {
         onFileUploaded(result.file)
-        // Clear the selected file immediately after successful upload
-        setSelectedFile(null)
-        setUploadProgress(0)
+        // Don't clear the selected file - keep it visible until sent
       } else {
         console.error("Upload failed:", result.error)
         // Reset
@@ -76,6 +80,8 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
       setSelectedFile(null)
       setUploadProgress(0)
       onCancel()
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -89,35 +95,31 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
     fileInputRef.current?.click()
   }
 
-  // If a file is selected, show file details and upload button
+  // If a file is selected, show file details
   if (selectedFile) {
     return (
       <div className="p-3 bg-gray-50 rounded-md w-full">
         <div className="flex justify-between items-center mb-2">
           <div className="truncate max-w-[200px]">{selectedFile.name}</div>
-          <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isUploading}>
+          <Button variant="ghost" size="sm" onClick={handleCancel} disabled={uploading || isUploading}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        {uploadProgress > 0 && (
+        {(uploadProgress > 0 || uploading || isUploading) && (
           <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
             <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
           </div>
         )}
 
-        <div className="flex space-x-2">
-          <Button size="sm" onClick={handleUpload} className="w-full" disabled={isUploading}>
-            {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              "Upload"
-            )}
-          </Button>
-        </div>
+        {uploading || isUploading ? (
+          <div className="text-xs text-center text-gray-500">
+            <Loader2 className="h-4 w-4 mx-auto mb-1 animate-spin" />
+            Uploading...
+          </div>
+        ) : uploadProgress === 100 ? (
+          <div className="text-xs text-center text-green-600">Ready to send</div>
+        ) : null}
       </div>
     )
   }

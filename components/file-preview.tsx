@@ -85,7 +85,13 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
             <source src={fileUrl} type={fileAttachment.mimeType} />
             Your browser does not support the audio element.
           </audio>
-          <div className="text-xs text-gray-500 mt-1">{formatFileSize(fileAttachment.size)}</div>
+          <div className="flex justify-between items-center mt-2">
+            <div className="text-xs text-gray-500">{formatFileSize(fileAttachment.size)}</div>
+            <Button size="sm" variant="outline" onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
         </div>
       )
 
@@ -100,7 +106,13 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
             <source src={fileUrl} type={fileAttachment.mimeType} />
             Your browser does not support the video element.
           </video>
-          <div className="text-xs text-gray-500 mt-1">{formatFileSize(fileAttachment.size)}</div>
+          <div className="flex justify-between items-center mt-2">
+            <div className="text-xs text-gray-500">{formatFileSize(fileAttachment.size)}</div>
+            <Button size="sm" variant="outline" onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
         </div>
       )
 
@@ -159,7 +171,13 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
             alt={fileAttachment.originalFilename}
             className="max-w-full rounded-md"
           />
-          <div className="text-xs text-gray-500 mt-1">{formatFileSize(fileAttachment.size)}</div>
+          <div className="flex justify-between items-center mt-2">
+            <div className="text-xs text-gray-500">{formatFileSize(fileAttachment.size)}</div>
+            <Button size="sm" variant="outline" onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
         </div>
       )
 
