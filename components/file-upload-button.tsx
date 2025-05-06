@@ -48,6 +48,9 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
 
       if (result.success) {
         onFileUploaded(result.file)
+        // Clear the selected file immediately after successful upload
+        setSelectedFile(null)
+        setUploadProgress(0)
       } else {
         console.error("Upload failed:", result.error)
         // Reset
@@ -76,7 +79,7 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
   // If a file is selected, show file details and upload button
   if (selectedFile) {
     return (
-      <div className="p-3 bg-gray-50 rounded-md">
+      <div className="p-3 bg-gray-50 rounded-md w-full">
         <div className="flex justify-between items-center mb-2">
           <div className="truncate max-w-[200px]">{selectedFile.name}</div>
           <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isUploading}>
@@ -116,7 +119,13 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
         className="hidden"
         accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
       />
-      <Button variant="ghost" size="icon" onClick={triggerFileInput} disabled={isUploading}>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={triggerFileInput}
+        disabled={isUploading}
+        className="w-full md:w-auto"
+      >
         <Paperclip className="h-5 w-5" />
       </Button>
     </>
