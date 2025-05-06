@@ -185,7 +185,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const optimisticMessage = {
         _id: Date.now().toString(),
         sender: userId,
-        content: messageText || "", // Empty string instead of "Sent a file"
+        content: messageText || "Sent a file",
         read: false,
         createdAt: new Date().toISOString(),
         optimistic: true,
@@ -195,7 +195,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
-      // Don't clear the file attachment yet
+      setFileAttachment(null)
 
       // Enable auto-scroll when sending a message
       setAutoScroll(true)
@@ -214,7 +214,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const result = await sendMessage({
         userId,
         chatId,
-        content: messageText.trim() || "", // Empty string instead of "Sent a file"
+        content: messageText.trim() || "Sent a file",
         fileAttachment: fileAttachment,
       })
 
@@ -229,8 +229,6 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           setMessages(data.messages)
           lastMessageCountRef.current = data.messages.length
         }
-        // Add this line to clear the file attachment after successful sending
-        setFileAttachment(null)
       }
     } catch (error) {
       console.error("Error sending message:", error)
@@ -455,38 +453,34 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
-            {/* File upload button - Full width on mobile */}
-            <div className="flex justify-start md:justify-center">
-              <FileUploadButton
-                onFileUploaded={handleFileUploaded}
-                onCancel={handleCancelUpload}
-                isUploading={uploadingFile}
-              />
-            </div>
+          <form onSubmit={handleSendMessage} className="flex space-x-2">
+            {/* File upload button */}
+            <FileUploadButton
+              onFileUploaded={handleFileUploaded}
+              onCancel={handleCancelUpload}
+              isUploading={uploadingFile}
+            />
 
-            <div className="flex space-x-2 flex-1">
-              <Input
-                ref={inputRef}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
-                className="flex-1"
-                disabled={sending}
-                onFocus={() => {
-                  // On mobile, wait a bit for the keyboard to appear, then scroll
-                  setTimeout(() => {
-                    if (inputRef.current) {
-                      inputRef.current.scrollIntoView({ behavior: "smooth" })
-                    }
-                  }, 300)
-                }}
-              />
+            <Input
+              ref={inputRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
+              className="flex-1"
+              disabled={sending || !!fileAttachment}
+              onFocus={() => {
+                // On mobile, wait a bit for the keyboard to appear, then scroll
+                setTimeout(() => {
+                  if (inputRef.current) {
+                    inputRef.current.scrollIntoView({ behavior: "smooth" })
+                  }
+                }, 300)
+              }}
+            />
 
-              <Button type="submit" disabled={(messageText.trim() === "" && !fileAttachment) || sending}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button type="submit" disabled={(!messageText.trim() && !fileAttachment) || sending}>
+              <Send className="h-4 w-4" />
+            </Button>
           </form>
         )}
       </div>
