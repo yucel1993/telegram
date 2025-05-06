@@ -12,10 +12,10 @@ export async function uploadFile(formData: FormData) {
       return { success: false, error: "No file provided" }
     }
 
-    // Check file size (limit to 50MB)
-    const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+    // Check file size (limit to 8MB)
+    const MAX_FILE_SIZE = 8 * 1024 * 1024 // 8MB
     if (file.size > MAX_FILE_SIZE) {
-      return { success: false, error: "File size exceeds 50MB limit" }
+      return { success: false, error: "File size exceeds 8MB limit" }
     }
 
     // Get file details
