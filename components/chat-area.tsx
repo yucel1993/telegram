@@ -410,7 +410,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                   <div
                     className={`max-w-[70%] p-3 rounded-lg ${
                       isCurrentUser
-                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-4`
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-6`
                         : "bg-white text-gray-800 border border-gray-200 ml-1"
                     }`}
                   >
@@ -483,7 +483,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+          <form onSubmit={handleSendMessage} className={`flex items-center space-x-2 ${isMobile ? "pr-2" : ""}`}>
             <Input
               ref={inputRef}
               value={messageText}
