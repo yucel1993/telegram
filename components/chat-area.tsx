@@ -66,6 +66,12 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
 
           setMessages(data.messages)
+          // Always scroll to bottom on initial load
+          if (loading) {
+            setTimeout(() => {
+              scrollToBottom(false)
+            }, 100)
+          }
           lastMessageCountRef.current = data.messages.length
 
           // If we should auto-scroll, do it after the state update
@@ -127,7 +133,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [userId, chatId, autoScroll])
+  }, [userId, chatId, autoScroll, loading])
 
   // Handle scroll events to detect when user manually scrolls
   useEffect(() => {
@@ -392,8 +398,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                   <div
                     className={`max-w-[70%] p-3 rounded-lg ${
                       isCurrentUser
-                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
-                        : "bg-white text-gray-800 border border-gray-200"
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-1`
+                        : "bg-white text-gray-800 border border-gray-200 ml-1"
                     }`}
                   >
                     {/* Show sender name for group chats if it's not the current user */}
@@ -483,14 +489,23 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               }}
             />
 
-            {/* File upload button - now positioned between input and send button */}
-            <FileUploadButton
-              onFileUploaded={handleFileUploaded}
-              onCancel={handleCancelUpload}
-              isUploading={uploadingFile}
-            />
+            {/* File upload button - now positioned between input and send button with consistent size */}
+            <div className="flex-shrink-0">
+              <Button variant="ghost" size="icon" className="h-10 w-10 p-0" type="button">
+                <FileUploadButton
+                  onFileUploaded={handleFileUploaded}
+                  onCancel={handleCancelUpload}
+                  isUploading={uploadingFile}
+                />
+              </Button>
+            </div>
 
-            <Button type="submit" disabled={(messageText.trim() === "" && !fileAttachment) || sending}>
+            <Button
+              type="submit"
+              disabled={(messageText.trim() === "" && !fileAttachment) || sending}
+              size="icon"
+              className="h-10 w-10"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>

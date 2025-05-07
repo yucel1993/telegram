@@ -134,15 +134,7 @@ export default function FileUploadButton({ onFileUploaded, onCancel, isUploading
         className="hidden"
         accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
       />
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={triggerFileInput}
-        disabled={isUploading}
-        className="w-full md:w-auto"
-      >
-        <Paperclip className="h-5 w-5" />
-      </Button>
+      <Paperclip className="h-4 w-4" onClick={triggerFileInput} />
     </>
   )
 }

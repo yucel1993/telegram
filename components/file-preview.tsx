@@ -79,7 +79,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center mb-2">
             <FileAudio className="h-5 w-5 mr-2 text-blue-500" />
-            <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+            <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
           </div>
           <audio controls className="w-full">
             <source src={fileUrl} type={fileAttachment.mimeType} />
@@ -100,7 +100,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center mb-2">
             <FileVideo className="h-5 w-5 mr-2 text-blue-500" />
-            <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+            <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
           </div>
           <video controls className="w-full max-h-[300px]">
             <source src={fileUrl} type={fileAttachment.mimeType} />
@@ -123,7 +123,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center mb-2">
               <FileText className="h-5 w-5 mr-2 text-blue-500" />
-              <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+              <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
             </div>
             <div className="relative" style={{ paddingTop: "75%" }}>
               <iframe
@@ -147,7 +147,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center">
             <FileText className="h-5 w-5 mr-2 text-blue-500" />
-            <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+            <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
           </div>
           <div className="flex justify-between items-center mt-2">
             <div className="text-xs text-gray-500">{formatFileSize(fileAttachment.size)}</div>
@@ -164,7 +164,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center mb-2">
             <FileText className="h-5 w-5 mr-2 text-blue-500" />
-            <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+            <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
           </div>
           <img
             src={fileUrl || "/placeholder.svg"}
@@ -186,7 +186,7 @@ export default function FilePreview({ fileAttachment }: FilePreviewProps) {
         <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center">
             <File className="h-5 w-5 mr-2 text-blue-500" />
-            <span className="text-sm font-medium truncate">{fileAttachment.originalFilename}</span>
+            <span className="text-sm font-medium truncate text-gray-800">{fileAttachment.originalFilename}</span>
           </div>
           <div className="flex justify-between items-center mt-2">
             <div className="text-xs text-gray-500">{formatFileSize(fileAttachment.size)}</div>
