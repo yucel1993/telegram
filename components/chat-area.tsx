@@ -34,6 +34,7 @@ import { joinGroup } from "@/app/actions/groups"
 import { useMobile } from "@/hooks/use-mobile"
 import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
+import { cn } from "@/lib/utils"
 
 interface ChatAreaProps {
   userId: string
@@ -408,11 +409,14 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               return (
                 <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[70%] p-3 rounded-lg ${
+                    className={cn(
+                      "max-w-[70%] p-3 rounded-lg",
                       isCurrentUser
-                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-6`
-                        : "bg-white text-gray-800 border border-gray-200 ml-1"
-                    }`}
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                        : "bg-white text-gray-800 border border-gray-200 ml-1",
+                      // Apply different margins based on mobile/desktop and sender
+                      isCurrentUser && isMobile ? "mr-8" : isCurrentUser ? "mr-4" : "",
+                    )}
                   >
                     {/* Show sender name for group chats if it's not the current user */}
                     {isGroup && !isCurrentUser && (
@@ -483,7 +487,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className={`flex items-center space-x-2 ${isMobile ? "pr-2" : ""}`}>
+          <form onSubmit={handleSendMessage} className={`flex items-center space-x-2 ${isMobile ? "pr-4" : ""}`}>
             <Input
               ref={inputRef}
               value={messageText}
@@ -545,7 +549,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               type="submit"
               disabled={(messageText.trim() === "" && !fileAttachment) || sending}
               size="icon"
-              className="h-10 w-10"
+              className={cn("h-10 w-10", isMobile && "mr-2")}
             >
               <Send className="h-4 w-4" />
             </Button>
