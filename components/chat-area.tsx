@@ -426,7 +426,11 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               }
 
               return (
-                <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
+                <div
+                  key={message._id || index}
+                  className={`flex ${isCurrentUser ? "justify-end user-message-container" : "justify-start"}`}
+                  style={isCurrentUser && isMobile ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
+                >
                   <div
                     className={cn(
                       "p-3 rounded-lg",
@@ -440,9 +444,17 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                           ? "mr-4 max-w-[70%]"
                           : "max-w-[70%]",
                     )}
-                    style={isCurrentUser && isMobile ? { marginRight: "16px" } : {}}
+                    style={
+                      isCurrentUser && isMobile
+                        ? {
+                            marginRight: "16px",
+                            paddingRight: "24px",
+                            maxWidth: "calc(100% - 48px)", // Ensure message doesn't extend too far right
+                          }
+                        : {}
+                    }
                   >
-                    {/* Show sender name for group chats if it's not the current user */}
+                    {/* Rest of the message content remains the same */}
                     {isGroup && !isCurrentUser && (
                       <div className="text-xs font-medium mb-1 text-gray-500">
                         {message.senderName || "Unknown User"}
