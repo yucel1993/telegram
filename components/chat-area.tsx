@@ -5,7 +5,19 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus, Trash2, LogOut, MoreVertical, X } from "lucide-react"
+import {
+  Send,
+  ArrowDown,
+  ArrowLeft,
+  Users,
+  Info,
+  UserPlus,
+  Trash2,
+  LogOut,
+  MoreVertical,
+  X,
+  Paperclip,
+} from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -20,8 +32,8 @@ import {
 import { getChatMessages, sendMessage, markMessagesAsRead, deleteChat } from "@/app/actions/chats"
 import { joinGroup } from "@/app/actions/groups"
 import { useMobile } from "@/hooks/use-mobile"
-import FileUploadButton from "@/components/file-upload-button"
 import FilePreview from "@/components/file-preview"
+import { uploadFile } from "@/app/actions/upload"
 
 interface ChatAreaProps {
   userId: string
@@ -398,7 +410,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                   <div
                     className={`max-w-[70%] p-3 rounded-lg ${
                       isCurrentUser
-                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-1`
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""} mr-4`
                         : "bg-white text-gray-800 border border-gray-200 ml-1"
                     }`}
                   >
@@ -471,7 +483,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className="flex space-x-2">
+          <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
             <Input
               ref={inputRef}
               value={messageText}
@@ -490,15 +502,44 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             />
 
             {/* File upload button - now positioned between input and send button with consistent size */}
-            <div className="flex-shrink-0">
-              <Button variant="ghost" size="icon" className="h-10 w-10 p-0" type="button">
-                <FileUploadButton
-                  onFileUploaded={handleFileUploaded}
-                  onCancel={handleCancelUpload}
-                  isUploading={uploadingFile}
-                />
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 p-0 flex-shrink-0"
+              type="button"
+              onClick={() => document.getElementById("file-input")?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <input
+              id="file-input"
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setUploadingFile(true)
+                  const formData = new FormData()
+                  formData.append("file", e.target.files[0])
+                  uploadFile(formData)
+                    .then((result) => {
+                      if (result.success) {
+                        handleFileUploaded(result.file)
+                      } else {
+                        console.error("Upload failed:", result.error)
+                        handleCancelUpload()
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Error uploading file:", error)
+                      handleCancelUpload()
+                    })
+                    .finally(() => {
+                      e.target.value = ""
+                    })
+                }
+              }}
+              accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
+            />
 
             <Button
               type="submit"
