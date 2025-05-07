@@ -195,7 +195,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
-      // Don't clear the file attachment yet
+      // Clear the file attachment immediately after sending
+      setFileAttachment(null)
 
       // Enable auto-scroll when sending a message
       setAutoScroll(true)
@@ -230,7 +231,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           lastMessageCountRef.current = data.messages.length
         }
         // Add this line to clear the file attachment after successful sending
-        setFileAttachment(null)
+        // setFileAttachment(null)
       }
     } catch (error) {
       console.error("Error sending message:", error)
