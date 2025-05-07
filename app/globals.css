@@ -4,7 +4,6 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  overscroll-behavior-y: contain;
 }
 
 @layer utilities {
@@ -160,5 +159,26 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+  }
+}
+
+/* Add these styles at the end of the file to ensure they have high specificity */
+
+/* Fix for mobile chat messages - ensure they don't stick to the right edge */
+@media (max-width: 768px) {
+  /* Target user messages specifically */
+  .user-message-mobile {
+    margin-right: 16px !important; /* Use !important to override any inline styles */
+    max-width: 70% !important;
+  }
+
+  /* Ensure the send button stays away from the edge */
+  .mobile-send-button {
+    margin-right: 12px !important;
+  }
+
+  /* Add extra padding to the form container */
+  .mobile-form-container {
+    padding-right: 16px !important;
   }
 }

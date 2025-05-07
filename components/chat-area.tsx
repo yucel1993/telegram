@@ -69,6 +69,21 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const lastMessageCountRef = useRef(0)
   const isMobile = useMobile()
 
+  // Process messages to ensure consistent styling
+  const processMessages = (msgs: any[]) => {
+    return msgs.map((msg) => {
+      // Clone the message to avoid mutating the original
+      const processedMsg = { ...msg }
+
+      // Add a flag to identify user messages for styling
+      if (processedMsg.sender === userId) {
+        processedMsg.isUserMessage = true
+      }
+
+      return processedMsg
+    })
+  }
+
   useEffect(() => {
     async function fetchMessages() {
       try {
@@ -78,7 +93,9 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           // Only auto-scroll if new messages have been added
           const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
 
-          setMessages(data.messages)
+          // Process messages to ensure consistent styling
+          setMessages(processMessages(data.messages))
+
           // Always scroll to bottom on initial load
           if (loading) {
             setTimeout(() => {
@@ -210,6 +227,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         optimistic: true,
         senderName: "You", // For group chats
         fileAttachment: fileAttachment,
+        isUserMessage: true, // Flag for styling
       }
 
       setMessages((prev) => [...prev, optimisticMessage])
@@ -246,7 +264,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         // Fetch messages again to update the list with the actual message
         const data = await getChatMessages({ userId, chatId })
         if (data.messages && Array.isArray(data.messages)) {
-          setMessages(data.messages)
+          // Process messages to ensure consistent styling
+          setMessages(processMessages(data.messages))
           lastMessageCountRef.current = data.messages.length
         }
       }
@@ -395,7 +414,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             messages.map((message, index) => {
               // Check if this is a new sender compared to the previous message
               const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
-              const isCurrentUser = message.sender === userId
+              const isCurrentUser = message.sender === userId || message.isUserMessage
 
               // Handle system messages differently
               if (message.isSystemMessage) {
@@ -410,13 +429,18 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
                   <div
                     className={cn(
-                      "max-w-[70%] p-3 rounded-lg",
+                      "p-3 rounded-lg",
                       isCurrentUser
                         ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
                         : "bg-white text-gray-800 border border-gray-200 ml-1",
-                      // Apply different margins based on mobile/desktop and sender
-                      isCurrentUser && isMobile ? "mr-8" : isCurrentUser ? "mr-4" : "",
+                      // Apply different classes based on mobile/desktop and sender
+                      isCurrentUser && isMobile
+                        ? "user-message-mobile" // Special class for mobile user messages
+                        : isCurrentUser
+                          ? "mr-4 max-w-[70%]"
+                          : "max-w-[70%]",
                     )}
+                    style={isCurrentUser && isMobile ? { marginRight: "16px" } : {}}
                   >
                     {/* Show sender name for group chats if it's not the current user */}
                     {isGroup && !isCurrentUser && (
@@ -487,7 +511,10 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className={`flex items-center space-x-2 ${isMobile ? "pr-4" : ""}`}>
+          <form
+            onSubmit={handleSendMessage}
+            className={cn("flex items-center space-x-2", isMobile && "mobile-form-container")}
+          >
             <Input
               ref={inputRef}
               value={messageText}
@@ -549,7 +576,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               type="submit"
               disabled={(messageText.trim() === "" && !fileAttachment) || sending}
               size="icon"
-              className={cn("h-10 w-10", isMobile && "mr-2")}
+              className={cn("h-10 w-10", isMobile && "mobile-send-button")}
             >
               <Send className="h-4 w-4" />
             </Button>
