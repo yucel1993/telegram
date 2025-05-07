@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus, Trash2, LogOut, MoreVertical } from "lucide-react"
+import { Send, ArrowDown, ArrowLeft, Users, Info, UserPlus, Trash2, LogOut, MoreVertical, X } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -195,7 +195,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
       setMessages((prev) => [...prev, optimisticMessage])
       setMessageText("")
-      // Don't clear the file attachment yet
+      // Clear the file attachment immediately after sending
+      setFileAttachment(null)
 
       // Enable auto-scroll when sending a message
       setAutoScroll(true)
@@ -229,8 +230,6 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           setMessages(data.messages)
           lastMessageCountRef.current = data.messages.length
         }
-        // Add this line to clear the file attachment after successful sending
-        setFileAttachment(null)
       }
     } catch (error) {
       console.error("Error sending message:", error)
@@ -443,6 +442,21 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         )}
       </div>
 
+      {/* File attachment preview */}
+      {fileAttachment && (
+        <div className="px-4 pt-2 bg-white">
+          <div className="p-3 bg-gray-50 rounded-md">
+            <div className="flex justify-between items-center mb-2">
+              <div className="truncate max-w-[200px]">{fileAttachment.originalFilename}</div>
+              <Button variant="ghost" size="sm" onClick={handleCancelUpload} disabled={sending}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="text-xs text-center text-green-600">Ready to send</div>
+          </div>
+        </div>
+      )}
+
       {/* Message input or Join Group button */}
       <div className="p-4 border-t border-gray-200 bg-white mt-auto">
         {isGroup && !isGroupMember ? (
@@ -451,38 +465,34 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
             {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
           </Button>
         ) : (
-          <form onSubmit={handleSendMessage} className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
-            {/* File upload button - Full width on mobile */}
-            <div className="flex justify-start md:justify-center">
-              <FileUploadButton
-                onFileUploaded={handleFileUploaded}
-                onCancel={handleCancelUpload}
-                isUploading={uploadingFile}
-              />
-            </div>
+          <form onSubmit={handleSendMessage} className="flex space-x-2">
+            <Input
+              ref={inputRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
+              className="flex-1"
+              disabled={sending}
+              onFocus={() => {
+                // On mobile, wait a bit for the keyboard to appear, then scroll
+                setTimeout(() => {
+                  if (inputRef.current) {
+                    inputRef.current.scrollIntoView({ behavior: "smooth" })
+                  }
+                }, 300)
+              }}
+            />
 
-            <div className="flex space-x-2 flex-1">
-              <Input
-                ref={inputRef}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
-                className="flex-1"
-                disabled={sending}
-                onFocus={() => {
-                  // On mobile, wait a bit for the keyboard to appear, then scroll
-                  setTimeout(() => {
-                    if (inputRef.current) {
-                      inputRef.current.scrollIntoView({ behavior: "smooth" })
-                    }
-                  }, 300)
-                }}
-              />
+            {/* File upload button - now positioned between input and send button */}
+            <FileUploadButton
+              onFileUploaded={handleFileUploaded}
+              onCancel={handleCancelUpload}
+              isUploading={uploadingFile}
+            />
 
-              <Button type="submit" disabled={(messageText.trim() === "" && !fileAttachment) || sending}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button type="submit" disabled={(messageText.trim() === "" && !fileAttachment) || sending}>
+              <Send className="h-4 w-4" />
+            </Button>
           </form>
         )}
       </div>
