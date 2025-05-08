@@ -35,8 +35,6 @@ import { useMobile } from "@/hooks/use-mobile"
 import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
 import { cn } from "@/lib/utils"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import ChatMedia from "@/components/chat-media"
 
 interface ChatAreaProps {
   userId: string
@@ -70,7 +68,6 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const lastMessageCountRef = useRef(0)
   const isMobile = useMobile()
-  const [activeTab, setActiveTab] = useState<"chat" | "media">("chat")
 
   // Process messages to ensure consistent styling
   const processMessages = (msgs: any[]) => {
@@ -408,121 +405,101 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         </div>
       </div>
 
-      {/* Tabs for switching between chat and media */}
-      <div className="bg-white border-b border-gray-200">
-        <Tabs defaultValue="chat" onValueChange={(value) => setActiveTab(value as "chat" | "media")}>
-          <TabsList className="w-full max-w-md mx-auto">
-            <TabsTrigger value="chat" className="flex-1">
-              Chat
-            </TabsTrigger>
-            <TabsTrigger value="media" className="flex-1">
-              Media
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      {/* Messages area */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-6 bg-gray-50 relative">
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
+          ) : (
+            messages.map((message, index) => {
+              // Check if this is a new sender compared to the previous message
+              const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
+              const isCurrentUser = message.sender === userId || message.isUserMessage
 
-      {activeTab === "chat" ? (
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-6 bg-gray-50 relative">
-          {/* Existing messages code */}
-          <div className="space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
-            ) : (
-              messages.map((message, index) => {
-                // Check if this is a new sender compared to the previous message
-                const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
-                const isCurrentUser = message.sender === userId || message.isUserMessage
-
-                // Handle system messages differently
-                if (message.isSystemMessage) {
-                  return (
-                    <div key={message._id || index} className="flex justify-center">
-                      <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">{message.content}</div>
-                    </div>
-                  )
-                }
-
+              // Handle system messages differently
+              if (message.isSystemMessage) {
                 return (
-                  <div
-                    key={message._id || index}
-                    className={`flex ${isCurrentUser ? "justify-end user-message-container" : "justify-start"}`}
-                    style={isCurrentUser && isMobile ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
-                  >
-                    <div
-                      className={cn(
-                        "p-3 rounded-lg",
-                        isCurrentUser
-                          ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
-                          : "bg-white text-gray-800 border border-gray-200 ml-1",
-                        // Apply different classes based on mobile/desktop and sender
-                        isCurrentUser && isMobile
-                          ? "user-message-mobile" // Special class for mobile user messages
-                          : isCurrentUser
-                            ? "mr-4 max-w-[70%]"
-                            : "max-w-[70%]",
-                      )}
-                      style={
-                        isCurrentUser && isMobile
-                          ? {
-                              marginRight: "16px",
-                              paddingRight: "24px",
-                              maxWidth: "calc(100% - 48px)",
-                              marginLeft: "4px", // Add 4px margin to the left
-                            }
-                          : {}
-                      }
-                    >
-                      {/* Rest of the message content remains the same */}
-                      {isGroup && !isCurrentUser && (
-                        <div className="text-xs font-medium mb-1 text-gray-500">
-                          {message.senderName || "Unknown User"}
-                        </div>
-                      )}
-
-                      {/* Message content */}
-                      {message.content && <p className="break-words">{message.content}</p>}
-
-                      {/* File attachment if present */}
-                      {message.fileAttachment && (
-                        <div
-                          className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
-                        >
-                          <FilePreview fileAttachment={message.fileAttachment} />
-                        </div>
-                      )}
-
-                      <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
-                        {new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                        {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
-                      </div>
-                    </div>
+                  <div key={message._id || index} className="flex justify-center">
+                    <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">{message.content}</div>
                   </div>
                 )
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+              }
 
-          {/* Scroll to bottom button */}
-          {showScrollButton && (
-            <Button
-              onClick={() => scrollToBottom()}
-              className="absolute bottom-4 right-4 rounded-full w-10 h-10 p-0 shadow-md"
-              size="icon"
-            >
-              <ArrowDown className="h-5 w-5" />
-            </Button>
+              return (
+                <div
+                  key={message._id || index}
+                  className={`flex ${isCurrentUser ? "justify-end user-message-container" : "justify-start"}`}
+                  style={isCurrentUser && isMobile ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
+                >
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg",
+                      isCurrentUser
+                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                        : "bg-white text-gray-800 border border-gray-200 ml-1",
+                      // Apply different classes based on mobile/desktop and sender
+                      isCurrentUser && isMobile
+                        ? "user-message-mobile" // Special class for mobile user messages
+                        : isCurrentUser
+                          ? "mr-4 max-w-[70%]"
+                          : "max-w-[70%]",
+                    )}
+                    style={
+                      isCurrentUser && isMobile
+                        ? {
+                            marginRight: "16px",
+                            paddingRight: "24px",
+                            maxWidth: "calc(100% - 48px)",
+                            marginLeft: "4px", // Add 4px margin to the left
+                          }
+                        : {}
+                    }
+                  >
+                    {/* Rest of the message content remains the same */}
+                    {isGroup && !isCurrentUser && (
+                      <div className="text-xs font-medium mb-1 text-gray-500">
+                        {message.senderName || "Unknown User"}
+                      </div>
+                    )}
+
+                    {/* Message content */}
+                    {message.content && <p className="break-words">{message.content}</p>}
+
+                    {/* File attachment if present */}
+                    {message.fileAttachment && (
+                      <div
+                        className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
+                      >
+                        <FilePreview fileAttachment={message.fileAttachment} />
+                      </div>
+                    )}
+
+                    <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
           )}
+          <div ref={messagesEndRef} />
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <ChatMedia userId={userId} chatId={chatId} />
-        </div>
-      )}
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <Button
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-4 right-4 rounded-full w-10 h-10 p-0 shadow-md"
+            size="icon"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        )}
+      </div>
 
       {/* File attachment preview */}
       {fileAttachment && (
@@ -539,91 +516,86 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         </div>
       )}
 
-      {activeTab === "chat" && (
-        <div className="p-4 border-t border-gray-200 bg-white mt-auto">
-          {isGroup && !isGroupMember ? (
-            <Button
-              onClick={handleJoinGroup}
-              className="w-full flex items-center justify-center"
-              disabled={joiningGroup}
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
-            </Button>
-          ) : (
-            <form
-              onSubmit={handleSendMessage}
-              className={cn("flex items-center space-x-2", isMobile && "mobile-form-container")}
-            >
-              <Input
-                ref={inputRef}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
-                className="flex-1"
-                disabled={sending}
-                onFocus={() => {
-                  // On mobile, wait a bit for the keyboard to appear, then scroll
-                  setTimeout(() => {
-                    if (inputRef.current) {
-                      inputRef.current.scrollIntoView({ behavior: "smooth" })
-                    }
-                  }, 300)
-                }}
-              />
-
-              {/* File upload button - now positioned between input and send button with consistent size */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 p-0 flex-shrink-0"
-                type="button"
-                onClick={() => document.getElementById("file-input")?.click()}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <input
-                id="file-input"
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    setUploadingFile(true)
-                    const formData = new FormData()
-                    formData.append("file", e.target.files[0])
-                    uploadFile(formData)
-                      .then((result) => {
-                        if (result.success) {
-                          handleFileUploaded(result.file)
-                        } else {
-                          console.error("Upload failed:", result.error)
-                          handleCancelUpload()
-                        }
-                      })
-                      .catch((error) => {
-                        console.error("Error uploading file:", error)
-                        handleCancelUpload()
-                      })
-                      .finally(() => {
-                        e.target.value = ""
-                      })
+      {/* Message input or Join Group button */}
+      <div className="p-4 border-t border-gray-200 bg-white mt-auto">
+        {isGroup && !isGroupMember ? (
+          <Button onClick={handleJoinGroup} className="w-full flex items-center justify-center" disabled={joiningGroup}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
+          </Button>
+        ) : (
+          <form
+            onSubmit={handleSendMessage}
+            className={cn("flex items-center space-x-2", isMobile && "mobile-form-container")}
+          >
+            <Input
+              ref={inputRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
+              className="flex-1"
+              disabled={sending}
+              onFocus={() => {
+                // On mobile, wait a bit for the keyboard to appear, then scroll
+                setTimeout(() => {
+                  if (inputRef.current) {
+                    inputRef.current.scrollIntoView({ behavior: "smooth" })
                   }
-                }}
-                accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
-              />
+                }, 300)
+              }}
+            />
 
-              <Button
-                type="submit"
-                disabled={(messageText.trim() === "" && !fileAttachment) || sending}
-                size="icon"
-                className={cn("h-10 w-10", isMobile && "mobile-send-button")}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          )}
-        </div>
-      )}
+            {/* File upload button - now positioned between input and send button with consistent size */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 p-0 flex-shrink-0"
+              type="button"
+              onClick={() => document.getElementById("file-input")?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <input
+              id="file-input"
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  setUploadingFile(true)
+                  const formData = new FormData()
+                  formData.append("file", e.target.files[0])
+                  uploadFile(formData)
+                    .then((result) => {
+                      if (result.success) {
+                        handleFileUploaded(result.file)
+                      } else {
+                        console.error("Upload failed:", result.error)
+                        handleCancelUpload()
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Error uploading file:", error)
+                      handleCancelUpload()
+                    })
+                    .finally(() => {
+                      e.target.value = ""
+                    })
+                }
+              }}
+              accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
+            />
+
+            <Button
+              type="submit"
+              disabled={(messageText.trim() === "" && !fileAttachment) || sending}
+              size="icon"
+              className={cn("h-10 w-10", isMobile && "mobile-send-button")}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
+      </div>
 
       {/* Delete Chat Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
