@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { getUserChats } from "@/app/actions/chats"
 import { Users } from "lucide-react"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface UserChatListProps {
   userId: string
@@ -70,18 +71,37 @@ export default function UserChatList({ userId, onSelectChat, selectedChatId }: U
           onClick={() => onSelectChat(chat._id)}
         >
           <div className="flex justify-between items-start">
-            <div>
-              {chat.isGroup ? (
-                <div className="flex items-center">
-                  <Users className="h-4 w-4 mr-1 text-gray-500" />
-                  <h3 className="font-medium">{chat.name || "Group Chat"}</h3>
-                </div>
-              ) : (
-                <h3 className="font-medium">{chat.otherUser?.username || "Unknown User"}</h3>
-              )}
-              <p className="text-sm text-gray-500 truncate">
-                {chat.lastMessage ? chat.lastMessage.content : "No messages yet"}
-              </p>
+            <div className="flex items-start">
+              <Avatar className="h-10 w-10 mr-3">
+                {chat.isGroup ? (
+                  chat.groupImage ? (
+                    <AvatarImage src={chat.groupImage || "/placeholder.svg"} alt={chat.name || "Group"} />
+                  ) : (
+                    <AvatarFallback>
+                      <Users className="h-5 w-5 text-gray-400" />
+                    </AvatarFallback>
+                  )
+                ) : chat.otherUser?.profileImage ? (
+                  <AvatarImage
+                    src={chat.otherUser.profileImage || "/placeholder.svg"}
+                    alt={chat.otherUser?.username || "User"}
+                  />
+                ) : (
+                  <AvatarFallback>{chat.otherUser?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                )}
+              </Avatar>
+              <div>
+                {chat.isGroup ? (
+                  <div className="flex items-center">
+                    <h3 className="font-medium">{chat.name || "Group Chat"}</h3>
+                  </div>
+                ) : (
+                  <h3 className="font-medium">{chat.otherUser?.username || "Unknown User"}</h3>
+                )}
+                <p className="text-sm text-gray-500 truncate">
+                  {chat.lastMessage ? chat.lastMessage.content : "No messages yet"}
+                </p>
+              </div>
             </div>
             {chat.lastMessage && (
               <span className="text-xs text-gray-400">

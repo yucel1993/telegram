@@ -164,7 +164,6 @@ export async function searchUsersAndGroups({
     const groups = await Chat.find({
       isGroup: true,
       $or: [{ name: searchRegex }, { description: searchRegex }],
-      location: { $exists: false }, // Only groups without location
     })
       .select("_id name description participants")
       .limit(3)
@@ -221,5 +220,64 @@ export async function createChat({
   } catch (error) {
     console.error("Error creating chat:", error)
     return null
+  }
+}
+
+// Add these functions to the users.ts file
+
+export async function getUserProfile({ userId }: { userId: string }) {
+  try {
+    await connectToDatabase()
+
+    const user = await User.findById(userId).select("username email profileImage")
+
+    if (!user) {
+      return null
+    }
+
+    // If user has a profile image, get the URL
+    let profileImageUrl = null
+    if (user.profileImage) {
+      try {
+        // Import dynamically to avoid server-side bundling issues
+        const { getFileSignedUrl } = await import("@/lib/s3-utils")
+        profileImageUrl = await getFileSignedUrl(user.profileImage)
+      } catch (error) {
+        console.error("Error getting profile image URL:", error)
+      }
+    }
+
+    return {
+      username: user.username,
+      email: user.email,
+      profileImage: profileImageUrl,
+    }
+  } catch (error) {
+    console.error("Error getting user profile:", error)
+    return null
+  }
+}
+
+export async function updateUserProfile({
+  userId,
+  profileImage,
+}: {
+  userId: string
+  profileImage: string | null
+}) {
+  try {
+    await connectToDatabase()
+
+    const updateData: any = {}
+    if (profileImage !== undefined) {
+      updateData.profileImage = profileImage
+    }
+
+    await User.findByIdAndUpdate(userId, { $set: updateData })
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating user profile:", error)
+    return { success: false, error: "Failed to update profile" }
   }
 }

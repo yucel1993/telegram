@@ -5,6 +5,7 @@ import { Chat } from "@/lib/models/chat"
 import { User } from "@/lib/models/user"
 import mongoose from "mongoose"
 
+// Update the getUserChats function to include profile and group images
 export async function getUserChats({ userId }: { userId: string }) {
   try {
     await connectToDatabase()
@@ -20,11 +21,23 @@ export async function getUserChats({ userId }: { userId: string }) {
         // Check if it's a group chat
         if (chat.isGroup) {
           // For group chats, return the group name and info
+          let groupImageUrl = null
+          if (chat.groupImage) {
+            try {
+              // Import dynamically to avoid server-side bundling issues
+              const { getFileSignedUrl } = await import("@/lib/s3-utils")
+              groupImageUrl = await getFileSignedUrl(chat.groupImage)
+            } catch (error) {
+              console.error("Error getting group image URL:", error)
+            }
+          }
+
           return {
             _id: chat._id,
             isGroup: true,
             name: chat.name,
             description: chat.description,
+            groupImage: groupImageUrl,
             lastMessage: chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null,
             unreadCount: chat.messages.filter((m) => m.sender.toString() !== userId && !m.read).length,
           }
@@ -34,7 +47,20 @@ export async function getUserChats({ userId }: { userId: string }) {
           let otherUser = null
 
           if (otherUserId) {
-            otherUser = await User.findById(otherUserId).select("_id username")
+            otherUser = await User.findById(otherUserId).select("_id username profileImage")
+
+            // If user has a profile image, get the URL
+            if (otherUser && otherUser.profileImage) {
+              try {
+                // Import dynamically to avoid server-side bundling issues
+                const { getFileSignedUrl } = await import("@/lib/s3-utils")
+                const profileImageUrl = await getFileSignedUrl(otherUser.profileImage)
+                otherUser = otherUser.toObject()
+                otherUser.profileImage = profileImageUrl
+              } catch (error) {
+                console.error("Error getting profile image URL:", error)
+              }
+            }
           }
 
           // Get the last message
@@ -408,5 +434,55 @@ export async function deleteChat({ userId, chatId }: { userId: string; chatId: s
   } catch (error) {
     console.error("Error deleting chat:", error)
     return { success: false, error: "Failed to delete chat" }
+  }
+}
+
+// Add this function to the chats.ts file
+
+export async function getChatMedia({ userId, chatId }: { userId: string; chatId: string }) {
+  try {
+    await connectToDatabase()
+
+    const chat = await Chat.findById(chatId)
+
+    if (!chat) {
+      return { success: false, error: "Chat not found" }
+    }
+
+    // Check if user is a participant
+    if (!chat.participants.some((p) => p.toString() === userId)) {
+      return { success: false, error: "Not authorized" }
+    }
+
+    // Filter messages with file attachments
+    const messagesWithFiles = chat.messages.filter((msg) => msg.fileAttachment)
+
+    // Get file details and URLs
+    const media = await Promise.all(
+      messagesWithFiles.map(async (msg) => {
+        const attachment = msg.fileAttachment
+        let url = null
+
+        try {
+          // Import dynamically to avoid server-side bundling issues
+          const { getFileSignedUrl } = await import("@/lib/s3-utils")
+          url = await getFileSignedUrl(attachment.s3Key)
+        } catch (error) {
+          console.error("Error getting file URL:", error)
+        }
+
+        return {
+          ...attachment,
+          url,
+          sender: msg.sender,
+          createdAt: msg.createdAt,
+        }
+      }),
+    )
+
+    return { success: true, media }
+  } catch (error) {
+    console.error("Error getting chat media:", error)
+    return { success: false, error: "Failed to get media" }
   }
 }

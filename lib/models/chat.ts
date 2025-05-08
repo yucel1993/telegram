@@ -57,6 +57,10 @@ const ChatSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    groupImage: {
+      type: String,
+      default: null,
+    },
     photo: {
       type: String,
       default: null,

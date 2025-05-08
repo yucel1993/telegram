@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, Users, Search, X, Check, ImageIcon, MapPin, Loader2, AlertCircle, Upload } from "lucide-react"
 import { searchUsers } from "@/app/actions/groups"
 import { createGroupWithLocation } from "@/app/actions/groups"
+import { uploadFile } from "@/app/actions/upload"
 
 interface CreateGroupProps {
   userId: string
@@ -32,6 +33,11 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
   const [creationError, setCreationError] = useState<string | null>(null)
+
+  // Add state for group image
+  const [groupImage, setGroupImage] = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     // Check if location is available
@@ -78,6 +84,47 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
     if (selectedUsers.length > 0) {
       setStep("details")
     }
+  }
+
+  // Add a function to handle image upload
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingImage(true)
+
+      // Create a preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // Upload to S3
+      const formData = new FormData()
+      formData.append("file", file)
+      const result = await uploadFile(formData)
+
+      if (result.success && result.file && result.file.s3Key) {
+        setGroupImage(result.file.s3Key)
+      } else {
+        console.error("Failed to upload image", result)
+        setImagePreview(null)
+        setGroupImage(null)
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      setImagePreview(null)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  // Add a function to remove the image
+  const handleRemoveImage = () => {
+    setGroupImage(null)
+    setImagePreview(null)
   }
 
   const handleCreateGroup = async () => {
@@ -127,6 +174,7 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
         description: groupDescription.trim(),
         participants: participantIds,
         location: location,
+        groupImage: groupImage, // Add the group image
       })
 
       if (result.success && result.chatId) {
@@ -240,11 +288,49 @@ export default function CreateGroup({ userId, onBack, onGroupCreated }: CreateGr
         ) : (
           <div className="p-4">
             <div className="mb-6 flex flex-col items-center">
-              <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                <ImageIcon className="h-8 w-8 text-gray-500" />
+              <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4 overflow-hidden">
+                {imagePreview ? (
+                  <img src={imagePreview || "/placeholder.svg"} alt="Group" className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-8 w-8 text-gray-500" />
+                )}
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  </div>
+                )}
               </div>
-              <div className="text-center">
-                <div className="text-sm text-gray-500 mb-1">Group Photo (Coming Soon)</div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById("group-image")?.click()}
+                  disabled={uploadingImage}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {imagePreview ? "Change Image" : "Upload Image"}
+                </Button>
+                {imagePreview && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveImage}
+                    disabled={uploadingImage}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Remove
+                  </Button>
+                )}
+                <input
+                  id="group-image"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                  disabled={uploadingImage}
+                />
               </div>
             </div>
 

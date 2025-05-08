@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus, Calendar } from "lucide-react"
+import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus, Calendar, Settings } from "lucide-react"
 import { logout } from "@/app/actions/auth"
 import { updateUserLocation, disableLocation } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
@@ -12,6 +12,7 @@ import UserSearch from "@/components/user-search"
 import CreateGroup from "@/components/create-group"
 import NearbySection from "@/components/nearby-section"
 import { useMobile } from "@/hooks/use-mobile"
+import UserSettings from "@/components/user-settings"
 
 interface ChatInterfaceProps {
   userId: string
@@ -27,6 +28,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [locationActive, setLocationActive] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [nearbyLoading, setNearbyLoading] = useState(false)
+  const [showUserSettings, setShowUserSettings] = useState(false)
   const router = useRouter()
   const isMobile = useMobile()
 
@@ -142,6 +144,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setShowNearbyUsers(false)
     setShowSearch(false)
     setShowCreateGroup(false)
+    setShowUserSettings(false)
   }
 
   const handleSearchClick = () => {
@@ -326,6 +329,13 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                 )}
               </>
             )}
+
+            {!showSearch && !showNearbyUsers && !showCreateGroup && !showUserSettings && (
+              <Button variant="outline" className="w-full mt-2" onClick={() => setShowUserSettings(true)}>
+                <Settings className="h-4 w-4 mr-2" />
+                Profile Settings
+              </Button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -335,6 +345,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               <NearbySection userId={userId} onSelectChat={handleSelectChat} onBack={handleBackToChats} />
             ) : showCreateGroup ? (
               <CreateGroup userId={userId} onBack={handleBackToChats} onGroupCreated={handleSelectChat} />
+            ) : showUserSettings ? (
+              <UserSettings userId={userId} onBack={() => setShowUserSettings(false)} />
             ) : (
               <UserChatList userId={userId} onSelectChat={handleSelectChat} selectedChatId={selectedChat} />
             )}

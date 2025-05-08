@@ -73,18 +73,21 @@ export async function createGroup({
   }
 }
 
+// Update the createGroupWithLocation function to accept groupImage parameter
 export async function createGroupWithLocation({
   userId,
   name,
   description,
   participants,
   location,
+  groupImage,
 }: {
   userId: string
   name: string
   description?: string
   participants: string[]
   location?: { latitude: number; longitude: number } | null
+  groupImage?: string | null
 }) {
   try {
     await connectToDatabase()
@@ -113,6 +116,11 @@ export async function createGroupWithLocation({
         type: "Point",
         coordinates: [location.longitude, location.latitude], // MongoDB uses [longitude, latitude]
       }
+    }
+
+    // Add group image if provided
+    if (groupImage) {
+      groupData.groupImage = groupImage
     }
 
     // Create and save the group
