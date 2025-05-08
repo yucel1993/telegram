@@ -251,7 +251,7 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
 
           <div className="space-y-2">
             <Label htmlFor="nativeLanguage">Native Language</Label>
-            <Select value={nativeLanguage || ""} onValueChange={setNativeLanguage}>
+            <Select value={nativeLanguage || "none"} onValueChange={setNativeLanguage}>
               <SelectTrigger id="nativeLanguage">
                 <SelectValue placeholder="Select your native language" />
               </SelectTrigger>
@@ -268,12 +268,12 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
 
           <div className="space-y-2">
             <Label htmlFor="targetLanguage">Target Language</Label>
-            <Select value={targetLanguage || ""} onValueChange={setTargetLanguage}>
+            <Select value={targetLanguage || "none"} onValueChange={setTargetLanguage}>
               <SelectTrigger id="targetLanguage">
                 <SelectValue placeholder="Select language you want to learn" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {languages.map((language) => (
                   <SelectItem key={language} value={language}>
                     {language}

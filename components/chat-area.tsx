@@ -17,6 +17,7 @@ import {
   MoreVertical,
   X,
   Paperclip,
+  Clock,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
@@ -31,10 +32,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { getChatMessages, sendMessage, markMessagesAsRead, deleteChat } from "@/app/actions/chats"
 import { joinGroup } from "@/app/actions/groups"
+import { getUserOnlineStatus } from "@/app/actions/users"
 import { useMobile } from "@/hooks/use-mobile"
 import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
 import { cn } from "@/lib/utils"
+import { formatDistanceToNow } from "date-fns"
 
 interface ChatAreaProps {
   userId: string
@@ -62,9 +65,17 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [fileAttachment, setFileAttachment] = useState<any>(null)
+  const [otherUserOnlineStatus, setOtherUserOnlineStatus] = useState<{
+    isOnline: boolean
+    lastActive: Date | null
+  }>({
+    isOnline: false,
+    lastActive: null,
+  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const onlineStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastMessageCountRef = useRef(0)
   const isMobile = useMobile()
@@ -134,6 +145,11 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           setOtherUser(data.otherUser)
           setIsGroupMember(true) // Always a member in direct chats
           setIsGroupAdmin(false)
+
+          // If it's a direct chat, fetch the other user's online status
+          if (data.otherUser && data.otherUser._id) {
+            fetchOtherUserOnlineStatus(data.otherUser._id)
+          }
         }
 
         setChatInitialized(true)
@@ -162,8 +178,45 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
       }
+      if (onlineStatusIntervalRef.current) {
+        clearInterval(onlineStatusIntervalRef.current)
+      }
     }
   }, [userId, chatId, autoScroll, loading])
+
+  // Fetch other user's online status
+  const fetchOtherUserOnlineStatus = async (otherUserId: string) => {
+    try {
+      const result = await getUserOnlineStatus({ userId: otherUserId })
+      if (result.success) {
+        setOtherUserOnlineStatus({
+          isOnline: result.isOnline,
+          lastActive: result.lastActive ? new Date(result.lastActive) : null,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching online status:", error)
+    }
+  }
+
+  // Set up polling for online status
+  useEffect(() => {
+    if (!isGroup && otherUser?._id) {
+      // Initial fetch
+      fetchOtherUserOnlineStatus(otherUser._id)
+
+      // Set up polling every 30 seconds
+      onlineStatusIntervalRef.current = setInterval(() => {
+        fetchOtherUserOnlineStatus(otherUser._id)
+      }, 30000)
+
+      return () => {
+        if (onlineStatusIntervalRef.current) {
+          clearInterval(onlineStatusIntervalRef.current)
+        }
+      }
+    }
+  }, [isGroup, otherUser])
 
   // Handle scroll events to detect when user manually scrolls
   useEffect(() => {
@@ -339,6 +392,12 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     setFileAttachment(null)
   }
 
+  // Format last active time
+  const formatLastActive = (date: Date | null) => {
+    if (!date) return "Unknown"
+    return formatDistanceToNow(date, { addSuffix: true })
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -373,7 +432,24 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 )}
               </div>
             ) : (
-              <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+              <div className="flex flex-col">
+                <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+                <div className="text-xs text-gray-500 flex items-center">
+                  {otherUserOnlineStatus.isOnline ? (
+                    <span className="flex items-center text-green-600">
+                      <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
+                      Online
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {otherUserOnlineStatus.lastActive
+                        ? `Last active ${formatLastActive(otherUserOnlineStatus.lastActive)}`
+                        : "Offline"}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 

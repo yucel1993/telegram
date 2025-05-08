@@ -3,9 +3,20 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Search, MapPin, LogOut, ArrowLeft, MapPinOff, Loader2, UserPlus, Calendar, Settings } from "lucide-react"
+import {
+  Search,
+  MapPin,
+  LogOut,
+  ArrowLeft,
+  MapPinOff,
+  Loader2,
+  UserPlus,
+  Calendar,
+  Settings,
+  Globe,
+} from "lucide-react"
 import { logout } from "@/app/actions/auth"
-import { updateUserLocation, disableLocation } from "@/app/actions/users"
+import { updateUserLocation, disableLocation, updateUserOnlineStatus } from "@/app/actions/users"
 import UserChatList from "@/components/user-chat-list"
 import ChatArea from "@/components/chat-area"
 import UserSearch from "@/components/user-search"
@@ -13,6 +24,7 @@ import CreateGroup from "@/components/create-group"
 import NearbySection from "@/components/nearby-section"
 import { useMobile } from "@/hooks/use-mobile"
 import UserSettings from "@/components/user-settings"
+import LanguageBuddies from "@/components/language-buddies"
 
 interface ChatInterfaceProps {
   userId: string
@@ -29,6 +41,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   const [locationLoading, setLocationLoading] = useState(false)
   const [nearbyLoading, setNearbyLoading] = useState(false)
   const [showUserSettings, setShowUserSettings] = useState(false)
+  const [showLanguageBuddies, setShowLanguageBuddies] = useState(false)
   const router = useRouter()
   const isMobile = useMobile()
 
@@ -40,7 +53,15 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
         // Don't automatically update location, wait for user to enable it
       }
     })
-  }, [])
+
+    // Set user as online when the component mounts
+    updateUserOnlineStatus({ userId, isOnline: true })
+
+    // Set user as offline when the component unmounts
+    return () => {
+      updateUserOnlineStatus({ userId, isOnline: false })
+    }
+  }, [userId])
 
   const updateLocation = async () => {
     if (navigator.geolocation) {
@@ -115,6 +136,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
         setShowNearbyUsers(true)
         setShowSearch(false)
         setShowCreateGroup(false)
+        setShowUserSettings(false)
+        setShowLanguageBuddies(false)
       } catch (error) {
         console.error("Error finding nearby users:", error)
       } finally {
@@ -124,6 +147,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
   }
 
   const handleLogout = async () => {
+    // Set user as offline before logging out
+    await updateUserOnlineStatus({ userId, isOnline: false })
     await logout()
     router.push("/")
     router.refresh()
@@ -134,6 +159,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setShowSearch(false)
     setShowNearbyUsers(false)
     setShowCreateGroup(false)
+    setShowUserSettings(false)
+    setShowLanguageBuddies(false)
   }
 
   const handleBackClick = () => {
@@ -145,22 +172,35 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
     setShowSearch(false)
     setShowCreateGroup(false)
     setShowUserSettings(false)
+    setShowLanguageBuddies(false)
   }
 
   const handleSearchClick = () => {
     setShowSearch(true)
     setShowNearbyUsers(false)
     setShowCreateGroup(false)
+    setShowUserSettings(false)
+    setShowLanguageBuddies(false)
   }
 
   const handleCreateGroupClick = () => {
     setShowCreateGroup(true)
     setShowSearch(false)
     setShowNearbyUsers(false)
+    setShowUserSettings(false)
+    setShowLanguageBuddies(false)
   }
 
   const handleEventsClick = () => {
     router.push("/events")
+  }
+
+  const handleLanguageBuddiesClick = () => {
+    setShowLanguageBuddies(true)
+    setShowSearch(false)
+    setShowNearbyUsers(false)
+    setShowCreateGroup(false)
+    setShowUserSettings(false)
   }
 
   // Determine what to show based on mobile/desktop and selected state
@@ -191,14 +231,14 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               </Button>
             </div>
 
-            {(showSearch || showNearbyUsers || showCreateGroup) && (
+            {(showSearch || showNearbyUsers || showCreateGroup || showUserSettings || showLanguageBuddies) && (
               <Button variant="outline" size="sm" onClick={handleBackToChats} className="mb-2 w-full">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Chats
               </Button>
             )}
 
-            {!showSearch && !showNearbyUsers && !showCreateGroup && (
+            {!showSearch && !showNearbyUsers && !showCreateGroup && !showUserSettings && !showLanguageBuddies && (
               <>
                 <div className="flex space-x-2 mb-2">
                   <Button variant="outline" className="flex-1" onClick={handleSearchClick}>
@@ -225,15 +265,21 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                   </Button>
                 </div>
 
-                <Button variant="outline" className="w-full" onClick={handleCreateGroupClick}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  New Group
-                </Button>
+                <div className="flex space-x-2 mb-2">
+                  <Button variant="outline" className="flex-1" onClick={handleCreateGroupClick}>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    New Group
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={handleLanguageBuddiesClick}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Language Buddies
+                  </Button>
+                </div>
               </>
             )}
 
             {/* Location status indicators */}
-            {!showSearch && !showNearbyUsers && !showCreateGroup && (
+            {!showSearch && !showNearbyUsers && !showCreateGroup && !showUserSettings && !showLanguageBuddies && (
               <>
                 {locationLoading && (
                   <div className="mt-2 p-2 bg-blue-50 rounded-md text-sm">
@@ -330,7 +376,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               </>
             )}
 
-            {!showSearch && !showNearbyUsers && !showCreateGroup && !showUserSettings && (
+            {!showSearch && !showNearbyUsers && !showCreateGroup && !showUserSettings && !showLanguageBuddies && (
               <Button variant="outline" className="w-full mt-2" onClick={() => setShowUserSettings(true)}>
                 <Settings className="h-4 w-4 mr-2" />
                 Profile Settings
@@ -347,6 +393,8 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
               <CreateGroup userId={userId} onBack={handleBackToChats} onGroupCreated={handleSelectChat} />
             ) : showUserSettings ? (
               <UserSettings userId={userId} onBack={() => setShowUserSettings(false)} />
+            ) : showLanguageBuddies ? (
+              <LanguageBuddies userId={userId} onBack={handleBackToChats} onSelectUser={handleSelectChat} />
             ) : (
               <UserChatList userId={userId} onSelectChat={handleSelectChat} selectedChatId={selectedChat} />
             )}
