@@ -22,6 +22,14 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    nativeLanguage: {
+      type: String,
+      default: null,
+    },
+    targetLanguage: {
+      type: String,
+      default: null,
+    },
     location: {
       type: {
         type: String,
@@ -40,6 +48,10 @@ const UserSchema = new mongoose.Schema(
     lastActive: {
       type: Date,
       default: Date.now,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
     },
     registeredEvents: [
       {

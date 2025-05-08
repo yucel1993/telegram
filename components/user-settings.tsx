@@ -10,11 +10,46 @@ import { ArrowLeft, User, Upload, Loader2, Check, AlertCircle, X } from "lucide-
 import { getUserProfile, updateUserProfile } from "@/app/actions/users"
 import { uploadFile } from "@/app/actions/upload"
 import ImageCropper from "./image-cropper"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface UserSettingsProps {
   userId: string
   onBack: () => void
 }
+
+// List of languages for the dropdown
+const languages = [
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Japanese",
+  "Chinese",
+  "Korean",
+  "Arabic",
+  "Hindi",
+  "Turkish",
+  "Dutch",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Polish",
+  "Czech",
+  "Greek",
+  "Hungarian",
+  "Romanian",
+  "Thai",
+  "Vietnamese",
+  "Indonesian",
+  "Malay",
+  "Filipino",
+  "Hebrew",
+  "Ukrainian",
+].sort()
 
 export default function UserSettings({ userId, onBack }: UserSettingsProps) {
   const [loading, setLoading] = useState(true)
@@ -26,6 +61,8 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [cropperImage, setCropperImage] = useState<string | null>(null)
+  const [nativeLanguage, setNativeLanguage] = useState<string | null>(null)
+  const [targetLanguage, setTargetLanguage] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -36,6 +73,8 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
           setUsername(profile.username || "")
           setProfileImage(profile.profileImage || null)
           setImagePreview(profile.profileImage || null)
+          setNativeLanguage(profile.nativeLanguage || null)
+          setTargetLanguage(profile.targetLanguage || null)
         }
       } catch (error) {
         console.error("Error fetching user profile:", error)
@@ -111,6 +150,8 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
       const result = await updateUserProfile({
         userId,
         profileImage,
+        nativeLanguage,
+        targetLanguage,
       })
 
       if (result.success) {
@@ -206,6 +247,43 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
             <Label htmlFor="username">Username</Label>
             <Input id="username" value={username} disabled className="bg-gray-50" />
             <p className="text-xs text-gray-500">Username cannot be changed</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="nativeLanguage">Native Language</Label>
+            <Select value={nativeLanguage || ""} onValueChange={setNativeLanguage}>
+              <SelectTrigger id="nativeLanguage">
+                <SelectValue placeholder="Select your native language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {languages.map((language) => (
+                  <SelectItem key={language} value={language}>
+                    {language}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="targetLanguage">Target Language</Label>
+            <Select value={targetLanguage || ""} onValueChange={setTargetLanguage}>
+              <SelectTrigger id="targetLanguage">
+                <SelectValue placeholder="Select language you want to learn" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None</SelectItem>
+                {languages.map((language) => (
+                  <SelectItem key={language} value={language}>
+                    {language}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Setting your language preferences helps you find language exchange partners
+            </p>
           </div>
 
           <Button type="submit" className="w-full" disabled={saving || uploadingImage}>
