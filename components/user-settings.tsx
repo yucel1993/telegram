@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, User, Upload, Loader2, Check, AlertCircle, X } from "lucide-react"
 import { getUserProfile, updateUserProfile } from "@/app/actions/users"
 import { uploadFile } from "@/app/actions/upload"
+import ImageCropper from "./image-cropper"
 
 interface UserSettingsProps {
   userId: string
@@ -24,6 +25,7 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [cropperImage, setCropperImage] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -46,27 +48,36 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
     fetchUserProfile()
   }, [userId])
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Create a preview and open cropper
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setCropperImage(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleCropComplete = async (croppedImage: string) => {
     try {
       setUploadingImage(true)
       setError(null)
+      setCropperImage(null)
+      setImagePreview(croppedImage)
 
-      // Create a preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      // Convert base64 to blob
+      const response = await fetch(croppedImage)
+      const blob = await response.blob()
+      const file = new File([blob], "profile-image.jpg", { type: "image/jpeg" })
 
       // Upload to S3
       const formData = new FormData()
       formData.append("file", file)
       const result = await uploadFile(formData)
 
-      if (result.success && result.file) {
+      if (result.success && result.file && result.file.s3Key) {
         setProfileImage(result.file.s3Key)
       } else {
         setError("Failed to upload image")
@@ -79,6 +90,10 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  const handleCropCancel = () => {
+    setCropperImage(null)
   }
 
   const handleRemoveImage = () => {
@@ -204,6 +219,15 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
             )}
           </Button>
         </form>
+      )}
+
+      {cropperImage && (
+        <ImageCropper
+          image={cropperImage}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          aspectRatio={1}
+        />
       )}
     </div>
   )

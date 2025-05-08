@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getChatMedia } from "@/app/actions/chats"
 import { getFileUrl } from "@/app/actions/files"
-import { FileText, FileAudio, FileVideo, File, Download, Loader2 } from "lucide-react"
+import { FileText, FileAudio, FileVideo, File, Download, Loader2, AlertCircle, RefreshCw } from "lucide-react"
 
 interface ChatMediaProps {
   userId: string
@@ -25,11 +25,16 @@ export default function ChatMedia({ userId, chatId }: ChatMediaProps) {
   const fetchMedia = async () => {
     try {
       setLoading(true)
+      setError(null)
+      console.log("Fetching media for chat:", chatId)
       const result = await getChatMedia({ userId, chatId })
+      console.log("Media fetch result:", result)
+
       if (result.success) {
         setMedia(result.media || [])
       } else {
-        setError("Failed to load media")
+        console.error("Failed to load media:", result.error)
+        setError(result.error || "Failed to load media")
       }
     } catch (error) {
       console.error("Error fetching media:", error)
@@ -89,9 +94,16 @@ export default function ChatMedia({ userId, chatId }: ChatMediaProps) {
       </Tabs>
 
       {error ? (
-        <div className="text-center text-red-500 py-4">{error}</div>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+          <div className="text-red-500 mb-4">{error}</div>
+          <Button variant="outline" size="sm" onClick={fetchMedia}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
       ) : filteredMedia.length === 0 ? (
-        <div className="text-center text-gray-500 py-8">No media found</div>
+        <div className="text-center text-gray-500 py-8">No media found in this chat</div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {filteredMedia.map((item, index) => {
@@ -103,7 +115,7 @@ export default function ChatMedia({ userId, chatId }: ChatMediaProps) {
                   <div className="aspect-square bg-gray-100 rounded-md overflow-hidden">
                     <img
                       src={item.url || "/placeholder.svg?height=200&width=200"}
-                      alt={item.originalFilename}
+                      alt={item.originalFilename || "Image"}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.src = "/placeholder.svg?height=200&width=200"
@@ -115,7 +127,7 @@ export default function ChatMedia({ userId, chatId }: ChatMediaProps) {
                       variant="outline"
                       size="sm"
                       className="bg-white"
-                      onClick={() => handleDownload(item.s3Key, item.originalFilename)}
+                      onClick={() => handleDownload(item.s3Key, item.originalFilename || "download.jpg")}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -133,11 +145,11 @@ export default function ChatMedia({ userId, chatId }: ChatMediaProps) {
                 <div
                   key={index}
                   className="p-3 bg-gray-50 rounded-md flex flex-col items-center justify-center aspect-square cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleDownload(item.s3Key, item.originalFilename)}
+                  onClick={() => handleDownload(item.s3Key, item.originalFilename || "file")}
                 >
                   <FileIcon className="h-8 w-8 mb-2 text-blue-500" />
-                  <div className="text-xs text-center truncate w-full">{item.originalFilename}</div>
-                  <div className="text-xs text-gray-500 mt-1">{formatFileSize(item.size)}</div>
+                  <div className="text-xs text-center truncate w-full">{item.originalFilename || "File"}</div>
+                  {item.size && <div className="text-xs text-gray-500 mt-1">{formatFileSize(item.size)}</div>}
                 </div>
               )
             }
