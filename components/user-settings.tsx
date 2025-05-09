@@ -171,7 +171,7 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20 md:pb-4">
       <div className="flex items-center mb-4">
         <Button variant="ghost" size="sm" onClick={onBack} className="mr-2">
           <ArrowLeft className="h-4 w-4" />
@@ -286,16 +286,18 @@ export default function UserSettings({ userId, onBack }: UserSettingsProps) {
             </p>
           </div>
 
-          <Button type="submit" className="w-full" disabled={saving || uploadingImage}>
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Changes"
-            )}
-          </Button>
+          <div className="pt-4 sticky bottom-0 bg-white pb-4">
+            <Button type="submit" className="w-full" disabled={saving || uploadingImage}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </div>
         </form>
       )}
 

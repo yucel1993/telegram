@@ -38,6 +38,7 @@ import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface ChatAreaProps {
   userId: string
@@ -422,32 +423,50 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
             {isGroup ? (
               <div className="flex items-center">
-                <Users className="h-5 w-5 mr-2 text-gray-500" />
-                <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
-                {groupInfo?.description && (
-                  <div className="ml-2 text-gray-500 text-sm flex items-center">
-                    <Info className="h-3 w-3 mr-1" />
-                    <span className="truncate max-w-[200px]">{groupInfo.description}</span>
-                  </div>
-                )}
+                <Avatar className="h-10 w-10 mr-3">
+                  <AvatarFallback>
+                    <Users className="h-5 w-5 text-gray-400" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
+                  {groupInfo?.description && (
+                    <div className="text-sm text-gray-500 flex items-center">
+                      <Info className="h-3 w-3 mr-1" />
+                      <span className="truncate max-w-[200px]">{groupInfo.description}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col">
-                <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
-                <div className="text-xs text-gray-500 flex items-center">
-                  {otherUserOnlineStatus.isOnline ? (
-                    <span className="flex items-center text-green-600">
-                      <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
-                      Online
-                    </span>
+              <div className="flex items-center">
+                <Avatar className="h-10 w-10 mr-3">
+                  {otherUser?.profileImage ? (
+                    <AvatarImage
+                      src={otherUser.profileImage || "/placeholder.svg"}
+                      alt={otherUser?.username || "User"}
+                    />
                   ) : (
-                    <span className="flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {otherUserOnlineStatus.lastActive
-                        ? `Last active ${formatLastActive(otherUserOnlineStatus.lastActive)}`
-                        : "Offline"}
-                    </span>
+                    <AvatarFallback>{otherUser?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                   )}
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+                  <div className="text-xs text-gray-500 flex items-center">
+                    {otherUserOnlineStatus.isOnline ? (
+                      <span className="flex items-center text-green-600">
+                        <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
+                        Online
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {otherUserOnlineStatus.lastActive
+                          ? `Last active ${formatLastActive(otherUserOnlineStatus.lastActive)}`
+                          : "Offline"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -481,7 +500,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         </div>
       </div>
 
-      {/* Messages area */}
+      {/* Messages area - Add padding-top to prevent messages from being hidden under the header */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-6 bg-gray-50 relative">
         <div className="space-y-4">
           {messages.length === 0 ? (
@@ -517,13 +536,13 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                       isCurrentUser && isMobile
                         ? "user-message-mobile" // Special class for mobile user messages
                         : isCurrentUser
-                          ? "mr-4 max-w-[70%]"
+                          ? "mr-12 max-w-[70%]" // Move user messages 2rem to the right (8px * 2 = 16px)
                           : "max-w-[70%]",
                     )}
                     style={
                       isCurrentUser && isMobile
                         ? {
-                            marginRight: "16px",
+                            marginRight: "48px", // Increased from 16px to 48px (2rem)
                             paddingRight: "24px",
                             maxWidth: "calc(100% - 48px)",
                             marginLeft: "4px", // Add 4px margin to the left
