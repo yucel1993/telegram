@@ -423,8 +423,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
 
             {isGroup ? (
               <div className="flex items-center">
-                <Avatar className="h-10 w-10 mr-3">
-                  <AvatarFallback>
+                <Avatar className="h-10 w-10 mr-3 rounded-full">
+                  <AvatarFallback className="rounded-full">
                     <Users className="h-5 w-5 text-gray-400" />
                   </AvatarFallback>
                 </Avatar>
@@ -440,14 +440,17 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               </div>
             ) : (
               <div className="flex items-center">
-                <Avatar className="h-10 w-10 mr-3">
+                <Avatar className="h-10 w-10 mr-3 rounded-full">
                   {otherUser?.profileImage ? (
                     <AvatarImage
                       src={otherUser.profileImage || "/placeholder.svg"}
                       alt={otherUser?.username || "User"}
+                      className="rounded-full"
                     />
                   ) : (
-                    <AvatarFallback>{otherUser?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    <AvatarFallback className="rounded-full">
+                      {otherUser?.username?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
                   )}
                 </Avatar>
                 <div>
@@ -500,8 +503,8 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         </div>
       </div>
 
-      {/* Messages area - Add padding-top to prevent messages from being hidden under the header */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-6 bg-gray-50 relative">
+      {/* Messages area - Increase padding-top to prevent messages from being hidden under the header */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-10 bg-gray-50 relative">
         <div className="space-y-4">
           {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</div>
@@ -524,7 +527,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 <div
                   key={message._id || index}
                   className={`flex ${isCurrentUser ? "justify-end user-message-container" : "justify-start"}`}
-                  style={isCurrentUser && isMobile ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
+                  style={isCurrentUser ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
                 >
                   <div
                     className={cn(
@@ -533,14 +536,12 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                         ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
                         : "bg-white text-gray-800 border border-gray-200 ml-1",
                       // Apply different classes based on mobile/desktop and sender
-                      isCurrentUser && isMobile
-                        ? "user-message-mobile" // Special class for mobile user messages
-                        : isCurrentUser
-                          ? "mr-12 max-w-[70%]" // Move user messages 2rem to the right (8px * 2 = 16px)
-                          : "max-w-[70%]",
+                      isCurrentUser
+                        ? "mr-12 max-w-[70%]" // Move user messages 2rem to the right (8px * 2 = 16px)
+                        : "max-w-[70%]",
                     )}
                     style={
-                      isCurrentUser && isMobile
+                      isCurrentUser
                         ? {
                             marginRight: "48px", // Increased from 16px to 48px (2rem)
                             paddingRight: "24px",
