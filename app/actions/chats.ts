@@ -237,6 +237,7 @@ export async function sendMessage({
     size: number
     s3Key: string
     fileType: string
+    isVoiceMessage?: boolean
   } | null
 }) {
   try {
@@ -284,21 +285,25 @@ export async function sendMessage({
     // If content is empty and there's a file attachment, use a more descriptive message based on file type
     let messageContent = content
     if (!content && fileAttachment) {
-      switch (fileAttachment.fileType) {
-        case "audio":
-          messageContent = "🎵 Audio file"
-          break
-        case "video":
-          messageContent = "🎬 Video file"
-          break
-        case "document":
-          messageContent = "📄 Document"
-          break
-        case "image":
-          messageContent = "🖼️ Image"
-          break
-        default:
-          messageContent = "📎 File"
+      if (fileAttachment.isVoiceMessage) {
+        messageContent = "🎤 Voice message"
+      } else {
+        switch (fileAttachment.fileType) {
+          case "audio":
+            messageContent = "🎵 Audio file"
+            break
+          case "video":
+            messageContent = "🎬 Video file"
+            break
+          case "document":
+            messageContent = "📄 Document"
+            break
+          case "image":
+            messageContent = "🖼️ Image"
+            break
+          default:
+            messageContent = "📎 File"
+        }
       }
     }
 

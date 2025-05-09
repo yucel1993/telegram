@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -19,6 +19,7 @@ import {
   Paperclip,
   Clock,
   Smile,
+  Mic,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
@@ -44,6 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import ReactionPicker from "./reaction-picker"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
+
 interface ChatAreaProps {
   userId: string
   chatId: string
@@ -55,6 +57,130 @@ interface ReactionGroup {
   count: number
   users: { userId: string; username: string }[]
 }
+
+// Memoized Message component to prevent re-renders
+const Message = memo(
+  ({
+    message,
+    isCurrentUser,
+    isGroup,
+    handleOpenReactionPicker,
+    groupReactions,
+    handleSelectEmoji,
+    userId,
+  }: {
+    message: any
+    isCurrentUser: boolean
+    isGroup: boolean
+    handleOpenReactionPicker: (messageId: string, event: React.MouseEvent) => void
+    groupReactions: (reactions: any[]) => ReactionGroup[]
+    handleSelectEmoji: (emoji: string) => void
+    userId: string
+  }) => {
+    // Handle system messages differently
+    if (message.isSystemMessage) {
+      return (
+        <div className="flex justify-center">
+          <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">{message.content}</div>
+        </div>
+      )
+    }
+
+    // Group reactions by emoji
+    const reactionGroups = groupReactions(message.reactions)
+
+    return (
+      <div className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
+        <div className="relative group">
+          <div
+            className={cn(
+              "p-3 rounded-lg",
+              isCurrentUser
+                ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                : "bg-white text-gray-800 border border-gray-200 ml-1",
+              isCurrentUser ? "mr-12" : "max-w-[70%]",
+            )}
+            style={{
+              maxWidth: "70%",
+              ...(isCurrentUser && { marginRight: "48px" }),
+            }}
+          >
+            {isGroup && !isCurrentUser && (
+              <div className="text-xs font-medium mb-1 text-gray-500">{message.senderName || "Unknown User"}</div>
+            )}
+
+            {/* Message content - ensure it's not split */}
+            {message.content && <p className="break-words whitespace-pre-wrap">{message.content}</p>}
+
+            {/* File attachment if present */}
+            {message.fileAttachment && (
+              <div className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}>
+                {message.fileAttachment.isVoiceMessage ? (
+                  <div className={`p-2 ${isCurrentUser ? "text-white" : "text-gray-800"}`}>
+                    <div className="flex items-center">
+                      <Mic className="h-4 w-4 mr-2" />
+                      <span className="text-xs">Voice message</span>
+                    </div>
+                    <audio
+                      src={message.fileAttachment.url}
+                      controls
+                      className="w-full mt-1 h-8"
+                      controlsList="nodownload"
+                    />
+                  </div>
+                ) : (
+                  <FilePreview fileAttachment={message.fileAttachment} />
+                )}
+              </div>
+            )}
+
+            <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
+              {new Date(message.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
+            </div>
+
+            {/* Reaction button - only visible on hover */}
+            <button
+              onClick={(e) => handleOpenReactionPicker(message._id, e)}
+              className={`absolute ${
+                isCurrentUser ? "-left-8" : "-right-8"
+              } top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-md hover:bg-gray-100`}
+            >
+              <Smile className="h-4 w-4 text-gray-500" />
+            </button>
+          </div>
+
+          {/* Display reactions */}
+          {reactionGroups.length > 0 && (
+            <div className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? "justify-end mr-12" : "justify-start"}`}>
+              <TooltipProvider>
+                {reactionGroups.map((group) => (
+                  <Tooltip key={group.emoji}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => handleSelectEmoji(group.emoji)}
+                        className="flex items-center bg-white border border-gray-200 rounded-full px-2 py-0.5 text-xs hover:bg-gray-50"
+                      >
+                        <span className="mr-1">{group.emoji}</span>
+                        <span>{group.count}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{group.users.map((user) => user.username).join(", ")}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </TooltipProvider>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  },
+)
+
+Message.displayName = "Message"
 
 export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [messages, setMessages] = useState<any[]>([])
@@ -76,6 +202,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [fileAttachment, setFileAttachment] = useState<any>(null)
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
   const [reactionPickerState, setReactionPickerState] = useState<{
     isOpen: boolean
     messageId: string | null
@@ -99,21 +226,25 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const lastMessageCountRef = useRef(0)
   const isMobile = useMobile()
+  const lastMessagesJsonRef = useRef<string>("")
 
   // Process messages to ensure consistent styling
-  const processMessages = (msgs: any[]) => {
-    return msgs.map((msg) => {
-      // Clone the message to avoid mutating the original
-      const processedMsg = { ...msg }
+  const processMessages = useCallback(
+    (msgs: any[]) => {
+      return msgs.map((msg) => {
+        // Clone the message to avoid mutating the original
+        const processedMsg = { ...msg }
 
-      // Add a flag to identify user messages for styling
-      if (processedMsg.sender === userId) {
-        processedMsg.isUserMessage = true
-      }
+        // Add a flag to identify user messages for styling
+        if (processedMsg.sender === userId) {
+          processedMsg.isUserMessage = true
+        }
 
-      return processedMsg
-    })
-  }
+        return processedMsg
+      })
+    },
+    [userId],
+  )
 
   useEffect(() => {
     async function fetchMessages() {
@@ -121,25 +252,36 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         const data = await getChatMessages({ userId, chatId })
 
         if (data.messages && Array.isArray(data.messages)) {
-          // Only auto-scroll if new messages have been added
-          const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
-
           // Process messages to ensure consistent styling
-          setMessages(processMessages(data.messages))
+          const processedMessages = processMessages(data.messages)
 
-          // Always scroll to bottom on initial load
-          if (loading) {
-            setTimeout(() => {
-              scrollToBottom(false)
-            }, 100)
-          }
-          lastMessageCountRef.current = data.messages.length
+          // Convert to JSON for comparison
+          const messagesJson = JSON.stringify(processedMessages)
 
-          // If we should auto-scroll, do it after the state update
-          if (shouldAutoScroll) {
-            setTimeout(() => {
-              scrollToBottom(false)
-            }, 100)
+          // Only update state if messages have actually changed
+          // This prevents unnecessary re-renders
+          if (messagesJson !== lastMessagesJsonRef.current) {
+            lastMessagesJsonRef.current = messagesJson
+
+            // Only auto-scroll if new messages have been added
+            const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
+
+            setMessages(processedMessages)
+
+            // Always scroll to bottom on initial load
+            if (loading) {
+              setTimeout(() => {
+                scrollToBottom(false)
+              }, 100)
+            }
+            lastMessageCountRef.current = data.messages.length
+
+            // If we should auto-scroll, do it after the state update
+            if (shouldAutoScroll) {
+              setTimeout(() => {
+                scrollToBottom(false)
+              }, 100)
+            }
           }
         }
 
@@ -202,7 +344,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         clearInterval(onlineStatusIntervalRef.current)
       }
     }
-  }, [userId, chatId, autoScroll, loading])
+  }, [userId, chatId, autoScroll, loading, processMessages])
 
   // Fetch other user's online status
   const fetchOtherUserOnlineStatus = async (otherUserId: string) => {
@@ -322,7 +464,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         inputRef.current?.focus()
       }, 0)
 
-      // Send message to server
+      // Send message to server - ensure we send the complete message
       const result = await sendMessage({
         userId,
         chatId,
@@ -339,8 +481,11 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         const data = await getChatMessages({ userId, chatId })
         if (data.messages && Array.isArray(data.messages)) {
           // Process messages to ensure consistent styling
-          setMessages(processMessages(data.messages))
+          const processedMessages = processMessages(data.messages)
+          setMessages(processedMessages)
           lastMessageCountRef.current = data.messages.length
+          // Update the JSON reference to prevent unnecessary re-renders
+          lastMessagesJsonRef.current = JSON.stringify(processedMessages)
         }
       }
     } catch (error) {
@@ -405,12 +550,31 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const handleFileUploaded = (fileData: any) => {
     setFileAttachment(fileData)
     setUploadingFile(false)
-    // Don't set default message text anymore
   }
 
   const handleCancelUpload = () => {
     setUploadingFile(false)
     setFileAttachment(null)
+  }
+
+  const handleVoiceRecorded = (fileData: any) => {
+    console.log("Voice message recorded:", fileData)
+
+    // Set the file attachment
+    setFileAttachment({
+      ...fileData,
+      type: "audio/webm",
+      isVoiceMessage: true, // Add a flag to identify voice messages
+    })
+
+    // Close the voice recorder
+    setShowVoiceRecorder(false)
+
+    // Auto-send the voice message after a short delay
+    setTimeout(() => {
+      const fakeEvent = { preventDefault: () => {} } as React.FormEvent
+      handleSendMessage(fakeEvent)
+    }, 300)
   }
 
   // Format last active time
@@ -420,30 +584,33 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   }
 
   // Handle opening the reaction picker
-  const handleOpenReactionPicker = (messageId: string, event: React.MouseEvent) => {
-    // Close the picker if it's already open for this message
-    if (reactionPickerState.isOpen && reactionPickerState.messageId === messageId) {
+  const handleOpenReactionPicker = useCallback(
+    (messageId: string, event: React.MouseEvent) => {
+      // Close the picker if it's already open for this message
+      if (reactionPickerState.isOpen && reactionPickerState.messageId === messageId) {
+        setReactionPickerState({
+          isOpen: false,
+          messageId: null,
+          position: null,
+        })
+        return
+      }
+
+      // Calculate position for the picker
+      const rect = event.currentTarget.getBoundingClientRect()
+      const position = {
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+      }
+
       setReactionPickerState({
-        isOpen: false,
-        messageId: null,
-        position: null,
+        isOpen: true,
+        messageId,
+        position,
       })
-      return
-    }
-
-    // Calculate position for the picker
-    const rect = event.currentTarget.getBoundingClientRect()
-    const position = {
-      top: rect.bottom + window.scrollY,
-      left: rect.left + window.scrollX,
-    }
-
-    setReactionPickerState({
-      isOpen: true,
-      messageId,
-      position,
-    })
-  }
+    },
+    [reactionPickerState.isOpen, reactionPickerState.messageId],
+  )
 
   // Handle selecting an emoji
   const handleSelectEmoji = async (emoji: string) => {
@@ -502,7 +669,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   }
 
   // Group reactions by emoji
-  const groupReactions = (reactions: any[] = []): ReactionGroup[] => {
+  const groupReactions = useCallback((reactions: any[] = []): ReactionGroup[] => {
     const groups: { [key: string]: ReactionGroup } = {}
 
     reactions.forEach((reaction) => {
@@ -522,7 +689,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     })
 
     return Object.values(groups)
-  }
+  }, [])
 
   if (loading) {
     return (
@@ -636,100 +803,19 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           ) : (
             messages.map((message, index) => {
               // Check if this is a new sender compared to the previous message
-              const isNewSender = index === 0 || messages[index - 1].sender !== message.sender
               const isCurrentUser = message.sender === userId || message.isUserMessage
 
-              // Handle system messages differently
-              if (message.isSystemMessage) {
-                return (
-                  <div key={message._id || index} className="flex justify-center">
-                    <div className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs">{message.content}</div>
-                  </div>
-                )
-              }
-
-              // Group reactions by emoji
-              const reactionGroups = groupReactions(message.reactions)
-
               return (
-                <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
-                  <div className="relative group">
-                    <div
-                      className={cn(
-                        "p-3 rounded-lg",
-                        isCurrentUser
-                          ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
-                          : "bg-white text-gray-800 border border-gray-200 ml-1",
-                        isCurrentUser ? "mr-12" : "max-w-[70%]",
-                      )}
-                      style={{
-                        maxWidth: "70%",
-                        ...(isCurrentUser && { marginRight: "48px" }),
-                      }}
-                    >
-                      {/* Rest of the message content remains the same */}
-                      {isGroup && !isCurrentUser && (
-                        <div className="text-xs font-medium mb-1 text-gray-500">
-                          {message.senderName || "Unknown User"}
-                        </div>
-                      )}
-
-                      {/* Message content */}
-                      {message.content && <p className="break-words">{message.content}</p>}
-
-                      {/* File attachment if present */}
-                      {message.fileAttachment && (
-                        <div
-                          className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
-                        >
-                          <FilePreview fileAttachment={message.fileAttachment} />
-                        </div>
-                      )}
-
-                      <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
-                        {new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                        {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
-                      </div>
-
-                      {/* Reaction button - only visible on hover */}
-                      <button
-                        onClick={(e) => handleOpenReactionPicker(message._id, e)}
-                        className={`absolute ${
-                          isCurrentUser ? "-left-8" : "-right-8"
-                        } top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-md hover:bg-gray-100`}
-                      >
-                        <Smile className="h-4 w-4 text-gray-500" />
-                      </button>
-                    </div>
-
-                    {/* Display reactions */}
-                    {reactionGroups.length > 0 && (
-                      <div
-                        className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? "justify-end mr-12" : "justify-start"}`}
-                      >
-                        <TooltipProvider>
-                          {reactionGroups.map((group) => (
-                            <Tooltip key={group.emoji}>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => handleSelectEmoji(group.emoji)}
-                                  className="flex items-center bg-white border border-gray-200 rounded-full px-2 py-0.5 text-xs hover:bg-gray-50"
-                                >
-                                  <span className="mr-1">{group.emoji}</span>
-                                  <span>{group.count}</span>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>{group.users.map((user) => user.username).join(", ")}</TooltipContent>
-                            </Tooltip>
-                          ))}
-                        </TooltipProvider>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <Message
+                  key={message._id || index}
+                  message={message}
+                  isCurrentUser={isCurrentUser}
+                  isGroup={isGroup}
+                  handleOpenReactionPicker={handleOpenReactionPicker}
+                  groupReactions={groupReactions}
+                  handleSelectEmoji={handleSelectEmoji}
+                  userId={userId}
+                />
               )
             })
           )}
@@ -757,8 +843,11 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         )}
       </div>
 
+      {/* Voice recorder */}
+     
+
       {/* File attachment preview */}
-      {fileAttachment && (
+      {fileAttachment && !showVoiceRecorder && (
         <div className="px-4 pt-2 bg-white">
           <div className="p-3 bg-gray-50 rounded-md">
             <div className="flex justify-between items-center mb-2">
@@ -773,85 +862,105 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       )}
 
       {/* Message input or Join Group button */}
-      <div className="p-4 border-t border-gray-200 bg-white mt-auto">
-        {isGroup && !isGroupMember ? (
-          <Button onClick={handleJoinGroup} className="w-full flex items-center justify-center" disabled={joiningGroup}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
-          </Button>
-        ) : (
-          <form
-            onSubmit={handleSendMessage}
-            className={cn("flex items-center space-x-2", isMobile && "mobile-form-container")}
-          >
-            <Input
-              ref={inputRef}
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
-              className="flex-1"
-              disabled={sending}
-              onFocus={() => {
-                // On mobile, wait a bit for the keyboard to appear, then scroll
-                setTimeout(() => {
-                  if (inputRef.current) {
-                    inputRef.current.scrollIntoView({ behavior: "smooth" })
-                  }
-                }, 300)
-              }}
-            />
-
-            {/* File upload button - now positioned between input and send button with consistent size */}
+      {!showVoiceRecorder && (
+        <div className="p-4 border-t border-gray-200 bg-white mt-auto">
+          {isGroup && !isGroupMember ? (
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 p-0 flex-shrink-0"
-              type="button"
-              onClick={() => document.getElementById("file-input")?.click()}
+              onClick={handleJoinGroup}
+              className="w-full flex items-center justify-center"
+              disabled={joiningGroup}
             >
-              <Paperclip className="h-4 w-4" />
+              <UserPlus className="h-4 w-4 mr-2" />
+              {joiningGroup ? "Joining..." : "Join Group to Send Messages"}
             </Button>
-            <input
-              id="file-input"
-              type="file"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  setUploadingFile(true)
-                  const formData = new FormData()
-                  formData.append("file", e.target.files[0])
-                  uploadFile(formData)
-                    .then((result) => {
-                      if (result.success) {
-                        handleFileUploaded(result.file)
-                      } else {
-                        console.error("Upload failed:", result.error)
+          ) : (
+            <form
+              onSubmit={handleSendMessage}
+              className={cn("flex items-center space-x-2", isMobile && "mobile-form-container")}
+            >
+              <Input
+                ref={inputRef}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder={fileAttachment ? "Add a message (optional)" : "Type a message..."}
+                className="flex-1"
+                disabled={sending}
+                onFocus={() => {
+                  // On mobile, wait a bit for the keyboard to appear, then scroll
+                  setTimeout(() => {
+                    if (inputRef.current) {
+                      inputRef.current.scrollIntoView({ behavior: "smooth" })
+                    }
+                  }, 300)
+                }}
+              />
+
+              {/* Voice message button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 p-0 flex-shrink-0"
+                type="button"
+                onClick={() => {
+                  console.log("Opening voice recorder")
+                  setShowVoiceRecorder(true)
+                }}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+
+              {/* File upload button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 p-0 flex-shrink-0"
+                type="button"
+                onClick={() => document.getElementById("file-input")?.click()}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <input
+                id="file-input"
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setUploadingFile(true)
+                    const formData = new FormData()
+                    formData.append("file", e.target.files[0])
+                    uploadFile(formData)
+                      .then((result) => {
+                        if (result.success) {
+                          handleFileUploaded(result.file)
+                        } else {
+                          console.error("Upload failed:", result.error)
+                          handleCancelUpload()
+                        }
+                      })
+                      .catch((error) => {
+                        console.error("Error uploading file:", error)
                         handleCancelUpload()
-                      }
-                    })
-                    .catch((error) => {
-                      console.error("Error uploading file:", error)
-                      handleCancelUpload()
-                    })
-                    .finally(() => {
-                      e.target.value = ""
-                    })
-                }
-              }}
-              accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
-            />
+                      })
+                      .finally(() => {
+                        e.target.value = ""
+                      })
+                  }
+                }}
+                accept="audio/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
+              />
 
-            <Button
-              type="submit"
-              disabled={(messageText.trim() === "" && !fileAttachment) || sending}
-              size="icon"
-              className={cn("h-10 w-10", isMobile && "mobile-send-button")}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-        )}
-      </div>
+              <Button
+                type="submit"
+                disabled={(messageText.trim() === "" && !fileAttachment) || sending}
+                size="icon"
+                className={cn("h-10 w-10", isMobile && "mobile-send-button")}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Delete Chat Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
