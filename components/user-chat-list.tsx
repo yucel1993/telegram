@@ -1,9 +1,32 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, memo } from "react"
 import { getUserChats } from "@/app/actions/chats"
 import { Users } from "lucide-react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+
+// Memoized Avatar component to prevent re-renders
+const MemoizedAvatar = memo(({ chat }: { chat: any }) => {
+  return (
+    <Avatar className="h-10 w-10 mr-3">
+      {chat.isGroup ? (
+        chat.groupImage ? (
+          <AvatarImage src={chat.groupImage || "/placeholder.svg"} alt={chat.name || "Group"} />
+        ) : (
+          <AvatarFallback>
+            <Users className="h-5 w-5 text-gray-400" />
+          </AvatarFallback>
+        )
+      ) : chat.otherUser?.profileImage ? (
+        <AvatarImage src={chat.otherUser.profileImage || "/placeholder.svg"} alt={chat.otherUser?.username || "User"} />
+      ) : (
+        <AvatarFallback>{chat.otherUser?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+      )}
+    </Avatar>
+  )
+})
+
+MemoizedAvatar.displayName = "MemoizedAvatar"
 
 interface UserChatListProps {
   userId: string
@@ -15,12 +38,20 @@ export default function UserChatList({ userId, onSelectChat, selectedChatId }: U
   const [chats, setChats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const previousChatsRef = useRef<string>("")
 
   useEffect(() => {
     async function fetchChats() {
       try {
         const userChats = await getUserChats({ userId })
-        setChats(userChats)
+
+        // Only update state if the chats have actually changed
+        // This prevents unnecessary re-renders
+        const chatsJson = JSON.stringify(userChats)
+        if (chatsJson !== previousChatsRef.current) {
+          previousChatsRef.current = chatsJson
+          setChats(userChats)
+        }
       } catch (error) {
         console.error("Error fetching chats:", error)
       } finally {
@@ -72,24 +103,7 @@ export default function UserChatList({ userId, onSelectChat, selectedChatId }: U
         >
           <div className="flex justify-between items-start">
             <div className="flex items-start">
-              <Avatar className="h-10 w-10 mr-3">
-                {chat.isGroup ? (
-                  chat.groupImage ? (
-                    <AvatarImage src={chat.groupImage || "/placeholder.svg"} alt={chat.name || "Group"} />
-                  ) : (
-                    <AvatarFallback>
-                      <Users className="h-5 w-5 text-gray-400" />
-                    </AvatarFallback>
-                  )
-                ) : chat.otherUser?.profileImage ? (
-                  <AvatarImage
-                    src={chat.otherUser.profileImage || "/placeholder.svg"}
-                    alt={chat.otherUser?.username || "User"}
-                  />
-                ) : (
-                  <AvatarFallback>{chat.otherUser?.username?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                )}
-              </Avatar>
+              <MemoizedAvatar chat={chat} />
               <div>
                 {chat.isGroup ? (
                   <div className="flex items-center">
