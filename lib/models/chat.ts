@@ -1,5 +1,21 @@
 import mongoose from "mongoose"
 
+const ReactionSchema = new mongoose.Schema({
+  emoji: {
+    type: String,
+    required: true,
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  username: {
+    type: String,
+    required: true,
+  },
+})
+
 const MessageSchema = new mongoose.Schema(
   {
     sender: {
@@ -39,6 +55,7 @@ const MessageSchema = new mongoose.Schema(
       },
       default: null,
     },
+    reactions: [ReactionSchema],
   },
   { timestamps: true },
 )

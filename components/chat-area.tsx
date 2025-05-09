@@ -18,6 +18,7 @@ import {
   X,
   Paperclip,
   Clock,
+  Smile,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
@@ -33,17 +34,26 @@ import {
 import { getChatMessages, sendMessage, markMessagesAsRead, deleteChat } from "@/app/actions/chats"
 import { joinGroup } from "@/app/actions/groups"
 import { getUserOnlineStatus } from "@/app/actions/users"
+import { addReaction } from "@/app/actions/reactions"
 import { useMobile } from "@/hooks/use-mobile"
 import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import ReactionPicker from "./reaction-picker"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ChatAreaProps {
   userId: string
   chatId: string
   onBack?: () => void
+}
+
+interface ReactionGroup {
+  emoji: string
+  count: number
+  users: { userId: string; username: string }[]
 }
 
 export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
@@ -66,6 +76,15 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [fileAttachment, setFileAttachment] = useState<any>(null)
+  const [reactionPickerState, setReactionPickerState] = useState<{
+    isOpen: boolean
+    messageId: string | null
+    position: { top: number; left: number } | null
+  }>({
+    isOpen: false,
+    messageId: null,
+    position: null,
+  })
   const [otherUserOnlineStatus, setOtherUserOnlineStatus] = useState<{
     isOnline: boolean
     lastActive: Date | null
@@ -282,6 +301,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         senderName: "You", // For group chats
         fileAttachment: fileAttachment,
         isUserMessage: true, // Flag for styling
+        reactions: [],
       }
 
       setMessages((prev) => [...prev, optimisticMessage])
@@ -397,6 +417,111 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const formatLastActive = (date: Date | null) => {
     if (!date) return "Unknown"
     return formatDistanceToNow(date, { addSuffix: true })
+  }
+
+  // Handle opening the reaction picker
+  const handleOpenReactionPicker = (messageId: string, event: React.MouseEvent) => {
+    // Close the picker if it's already open for this message
+    if (reactionPickerState.isOpen && reactionPickerState.messageId === messageId) {
+      setReactionPickerState({
+        isOpen: false,
+        messageId: null,
+        position: null,
+      })
+      return
+    }
+
+    // Calculate position for the picker
+    const rect = event.currentTarget.getBoundingClientRect()
+    const position = {
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+    }
+
+    setReactionPickerState({
+      isOpen: true,
+      messageId,
+      position,
+    })
+  }
+
+  // Handle selecting an emoji
+  const handleSelectEmoji = async (emoji: string) => {
+    if (!reactionPickerState.messageId) return
+
+    try {
+      // Optimistically update the UI
+      setMessages((prevMessages) =>
+        prevMessages.map((message) => {
+          if (message._id === reactionPickerState.messageId) {
+            // Check if the user has already reacted with this emoji
+            const existingReactionIndex = message.reactions?.findIndex(
+              (r: any) => r.userId === userId && r.emoji === emoji,
+            )
+
+            const updatedReactions = [...(message.reactions || [])]
+
+            if (existingReactionIndex >= 0) {
+              // Remove the reaction if it already exists
+              updatedReactions.splice(existingReactionIndex, 1)
+            } else {
+              // Add the reaction
+              updatedReactions.push({
+                emoji,
+                userId,
+                username: "You", // Temporary username for optimistic update
+              })
+            }
+
+            return {
+              ...message,
+              reactions: updatedReactions,
+            }
+          }
+          return message
+        }),
+      )
+
+      // Send the reaction to the server
+      await addReaction({
+        userId,
+        chatId,
+        messageId: reactionPickerState.messageId,
+        emoji,
+      })
+
+      // Close the reaction picker
+      setReactionPickerState({
+        isOpen: false,
+        messageId: null,
+        position: null,
+      })
+    } catch (error) {
+      console.error("Error adding reaction:", error)
+    }
+  }
+
+  // Group reactions by emoji
+  const groupReactions = (reactions: any[] = []): ReactionGroup[] => {
+    const groups: { [key: string]: ReactionGroup } = {}
+
+    reactions.forEach((reaction) => {
+      if (!groups[reaction.emoji]) {
+        groups[reaction.emoji] = {
+          emoji: reaction.emoji,
+          count: 0,
+          users: [],
+        }
+      }
+
+      groups[reaction.emoji].count++
+      groups[reaction.emoji].users.push({
+        userId: reaction.userId,
+        username: reaction.username,
+      })
+    })
+
+    return Object.values(groups)
   }
 
   if (loading) {
@@ -523,47 +648,86 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 )
               }
 
+              // Group reactions by emoji
+              const reactionGroups = groupReactions(message.reactions)
+
               return (
                 <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={cn(
-                      "p-3 rounded-lg",
-                      isCurrentUser
-                        ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
-                        : "bg-white text-gray-800 border border-gray-200 ml-1",
-                      isCurrentUser ? "mr-12" : "max-w-[70%]",
-                    )}
-                    style={{
-                      maxWidth: "70%",
-                      ...(isCurrentUser && { marginRight: "48px" }),
-                    }}
-                  >
-                    {/* Rest of the message content remains the same */}
-                    {isGroup && !isCurrentUser && (
-                      <div className="text-xs font-medium mb-1 text-gray-500">
-                        {message.senderName || "Unknown User"}
+                  <div className="relative group">
+                    <div
+                      className={cn(
+                        "p-3 rounded-lg",
+                        isCurrentUser
+                          ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
+                          : "bg-white text-gray-800 border border-gray-200 ml-1",
+                        isCurrentUser ? "mr-12" : "max-w-[70%]",
+                      )}
+                      style={{
+                        maxWidth: "70%",
+                        ...(isCurrentUser && { marginRight: "48px" }),
+                      }}
+                    >
+                      {/* Rest of the message content remains the same */}
+                      {isGroup && !isCurrentUser && (
+                        <div className="text-xs font-medium mb-1 text-gray-500">
+                          {message.senderName || "Unknown User"}
+                        </div>
+                      )}
+
+                      {/* Message content */}
+                      {message.content && <p className="break-words">{message.content}</p>}
+
+                      {/* File attachment if present */}
+                      {message.fileAttachment && (
+                        <div
+                          className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
+                        >
+                          <FilePreview fileAttachment={message.fileAttachment} />
+                        </div>
+                      )}
+
+                      <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
+                        {new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
                       </div>
-                    )}
 
-                    {/* Message content */}
-                    {message.content && <p className="break-words">{message.content}</p>}
-
-                    {/* File attachment if present */}
-                    {message.fileAttachment && (
-                      <div
-                        className={`mt-2 ${isCurrentUser ? "bg-blue-600" : "bg-gray-50"} rounded-md overflow-hidden`}
+                      {/* Reaction button - only visible on hover */}
+                      <button
+                        onClick={(e) => handleOpenReactionPicker(message._id, e)}
+                        className={`absolute ${
+                          isCurrentUser ? "-left-8" : "-right-8"
+                        } top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white shadow-md hover:bg-gray-100`}
                       >
-                        <FilePreview fileAttachment={message.fileAttachment} />
+                        <Smile className="h-4 w-4 text-gray-500" />
+                      </button>
+                    </div>
+
+                    {/* Display reactions */}
+                    {reactionGroups.length > 0 && (
+                      <div
+                        className={`flex flex-wrap gap-1 mt-1 ${isCurrentUser ? "justify-end mr-12" : "justify-start"}`}
+                      >
+                        <TooltipProvider>
+                          {reactionGroups.map((group) => (
+                            <Tooltip key={group.emoji}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => handleSelectEmoji(group.emoji)}
+                                  className="flex items-center bg-white border border-gray-200 rounded-full px-2 py-0.5 text-xs hover:bg-gray-50"
+                                >
+                                  <span className="mr-1">{group.emoji}</span>
+                                  <span>{group.count}</span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>{group.users.map((user) => user.username).join(", ")}</TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </div>
                     )}
-
-                    <div className={`text-xs mt-1 ${isCurrentUser ? "text-blue-100" : "text-gray-400"}`}>
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                      {isCurrentUser && <span className="ml-1">{message.read ? "✓✓" : "✓"}</span>}
-                    </div>
                   </div>
                 </div>
               )
@@ -581,6 +745,15 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
           >
             <ArrowDown className="h-5 w-5" />
           </Button>
+        )}
+
+        {/* Reaction picker */}
+        {reactionPickerState.isOpen && reactionPickerState.position && (
+          <ReactionPicker
+            onSelectEmoji={handleSelectEmoji}
+            onClose={() => setReactionPickerState({ isOpen: false, messageId: null, position: null })}
+            className="bottom-16 left-1/2 transform -translate-x-1/2"
+          />
         )}
       </div>
 
