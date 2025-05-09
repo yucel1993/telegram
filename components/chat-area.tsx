@@ -524,32 +524,19 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               }
 
               return (
-                <div
-                  key={message._id || index}
-                  className={`flex ${isCurrentUser ? "justify-end user-message-container" : "justify-start"}`}
-                  style={isCurrentUser ? { paddingRight: "32px", width: "90%", marginLeft: "auto" } : {}}
-                >
+                <div key={message._id || index} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}>
                   <div
                     className={cn(
                       "p-3 rounded-lg",
                       isCurrentUser
                         ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
                         : "bg-white text-gray-800 border border-gray-200 ml-1",
-                      // Apply different classes based on mobile/desktop and sender
-                      isCurrentUser
-                        ? "mr-12 max-w-[70%]" // Move user messages 2rem to the right (8px * 2 = 16px)
-                        : "max-w-[70%]",
+                      isCurrentUser ? "mr-12" : "max-w-[70%]",
                     )}
-                    style={
-                      isCurrentUser
-                        ? {
-                            marginRight: "48px", // Increased from 16px to 48px (2rem)
-                            paddingRight: "24px",
-                            maxWidth: "calc(100% - 48px)",
-                            marginLeft: "4px", // Add 4px margin to the left
-                          }
-                        : {}
-                    }
+                    style={{
+                      maxWidth: "70%",
+                      ...(isCurrentUser && { marginRight: "48px" }),
+                    }}
                   >
                     {/* Rest of the message content remains the same */}
                     {isGroup && !isCurrentUser && (
