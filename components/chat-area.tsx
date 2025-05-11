@@ -96,7 +96,7 @@ const Message = memo(
             className={cn(
               "p-3 rounded-lg",
               isCurrentUser
-                ? `bg-blue-500 pr-2 text-white ${message.optimistic ? "opacity-70" : ""}`
+                ? `bg-blue-500 pr-8 text-white ${message.optimistic ? "opacity-70" : ""}`
                 : "bg-white text-gray-800 border border-gray-200 ml-1",
            //   isCurrentUser ? "mr-12" : "max-w-[70%]",
             )}
