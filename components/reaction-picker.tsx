@@ -60,23 +60,17 @@ export default function ReactionPicker({ onSelectEmoji, onClose, position = null
 
   if (!isOpen) return null
 
-  // Default positioning if none provided
-  const defaultStyle = position
-    ? {
-        position: "absolute" as const,
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-      }
-    : {}
-
   return (
     <div
       ref={pickerRef}
       className={cn(
-        "z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex flex-wrap gap-1 border border-gray-200 dark:border-gray-700",
+        "fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 flex flex-wrap gap-1 border border-gray-200 dark:border-gray-700",
         className,
       )}
-      style={defaultStyle}
+      style={{
+        top: position?.top || 0,
+        left: position?.left || 0,
+      }}
       data-testid="reaction-picker"
     >
       {commonEmojis.map((emoji) => (

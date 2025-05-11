@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, memo } from "react"
+import { useState, memo, useRef } from "react"
 import { Smile, Mic } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -28,6 +28,7 @@ const ChatMessage = memo(
   ({ message, isCurrentUser, isGroup, userId, onReactionAdd, groupReactions }: ChatMessageProps) => {
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number } | null>(null)
+    const messageRef = useRef<HTMLDivElement>(null)
 
     // Handle system messages differently
     if (message.isSystemMessage) {
@@ -44,13 +45,18 @@ const ChatMessage = memo(
     const handleReactionButtonClick = (event: React.MouseEvent) => {
       event.stopPropagation()
 
-      // Calculate position for the picker
-      const rect = event.currentTarget.getBoundingClientRect()
+      // Get the button element that was clicked
+      const button = event.currentTarget
+      const buttonRect = button.getBoundingClientRect()
 
-      // Position the picker above the message for current user, below for others
+      // Calculate position for the picker
+      // For current user (right side), position to the left of the button
+      // For other users (left side), position to the right of the button
       const position = {
-        top: isCurrentUser ? rect.top - 60 : rect.bottom + 10,
-        left: isCurrentUser ? rect.left - 100 : rect.left,
+        top: buttonRect.top + window.scrollY - 40, // Position above the button
+        left: isCurrentUser
+          ? buttonRect.left + window.scrollX - 180 // For current user messages (right side)
+          : buttonRect.right + window.scrollX + 10, // For other user messages (left side)
       }
 
       setPickerPosition(position)
@@ -63,7 +69,7 @@ const ChatMessage = memo(
     }
 
     return (
-      <div className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} relative`}>
+      <div ref={messageRef} className={`flex ${isCurrentUser ? "justify-end" : "justify-start"} relative`}>
         <div className="relative group max-w-[70%]">
           <div
             className={cn(
