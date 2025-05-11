@@ -44,7 +44,7 @@ import { formatDistanceToNow } from "date-fns"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import ReactionPicker from "./reaction-picker"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import VoiceRecorder from "./voice-recorder"
+
 
 interface ChatAreaProps {
   userId: string
@@ -857,10 +857,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         )}
       </div>
 
-      {/* Voice recorder */}
-      {showVoiceRecorder && (
-        <VoiceRecorder onVoiceRecorded={handleVoiceRecorded} onCancel={() => setShowVoiceRecorder(false)} />
-      )}
+   
 
       {/* File attachment preview */}
       {fileAttachment && !showVoiceRecorder && (
