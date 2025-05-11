@@ -94,7 +94,7 @@ const Message = memo(
         <div className="relative group">
           <div
             className={cn(
-              "p-3 rounded-lg",
+              "p-3 rounded-lg max-w-[70%]",
               isCurrentUser
                 ? `bg-blue-500 pr-8 text-white ${message.optimistic ? "opacity-70" : ""}`
                 : "bg-white text-gray-800 border border-gray-200 ml-1",
