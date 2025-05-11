@@ -98,11 +98,11 @@ const Message = memo(
               isCurrentUser
                 ? `bg-blue-500 text-white ${message.optimistic ? "opacity-70" : ""}`
                 : "bg-white text-gray-800 border border-gray-200 ml-1",
-              isCurrentUser ? "mr-12" : "max-w-[70%]",
+           //   isCurrentUser ? "mr-12" : "max-w-[70%]",
             )}
             style={{
               maxWidth: "70%",
-              ...(isCurrentUser && { marginRight: "48px" }),
+           //   ...(isCurrentUser && { marginRight: "12px" }),
             }}
           >
             {isGroup && !isCurrentUser && (
