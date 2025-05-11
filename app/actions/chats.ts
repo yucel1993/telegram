@@ -193,6 +193,9 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
       // Check if the current user is an admin
       const isAdmin = chat.admins.some((a) => a.toString() === userId)
 
+      // Add group image if available
+      const { getFileSignedUrl } = await import("@/lib/s3-utils")
+
       return {
         messages: messagesWithSenderNames,
         isGroup: true,
@@ -202,11 +205,34 @@ export async function getChatMessages({ userId, chatId }: { userId: string; chat
         admins: chat.admins,
         isGroupMember,
         isAdmin,
+        groupImage: chat.groupImage ? await getFileSignedUrl(chat.groupImage) : null,
       }
     } else {
       // For direct chats, find the other user
       const otherUserId = chat.participants.find((p) => p.toString() !== userId)
-      const otherUser = await User.findById(otherUserId).select("_id username")
+      const otherUser = await User.findById(otherUserId).select("_id username profileImage")
+
+      // If user has a profile image, get the URL
+      if (otherUser && otherUser.profileImage) {
+        try {
+          // Import dynamically to avoid server-side bundling issues
+          const { getFileSignedUrl } = await import("@/lib/s3-utils")
+          const profileImageUrl = await getFileSignedUrl(otherUser.profileImage)
+
+          // Convert to plain object and add the profile image URL
+          const otherUserObj = otherUser.toObject ? otherUser.toObject() : otherUser
+          otherUserObj.profileImage = profileImageUrl
+
+          return {
+            messages: chat.messages || [],
+            otherUser: otherUserObj,
+            isGroup: false,
+            isGroupMember: true, // Always a member in direct chats
+          }
+        } catch (error) {
+          console.error("Error getting profile image URL:", error)
+        }
+      }
 
       return {
         messages: chat.messages || [],
