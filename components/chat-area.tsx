@@ -974,7 +974,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
               />
 
               {/* Voice message button */}
-              <Button
+              {/* <Button
                 variant="ghost"
                 size="icon"
                 className="h-10 w-10 p-0 flex-shrink-0"
@@ -985,7 +985,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
                 }}
               >
                 <Mic className="h-4 w-4" />
-              </Button>
+              </Button> */}
 
               {/* File upload button */}
               <Button
