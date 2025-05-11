@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef, useCallback, memo } from "react"
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -41,7 +41,7 @@ import FilePreview from "@/components/file-preview"
 import { uploadFile } from "@/app/actions/upload"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import MemoizedAvatar from "./memoized-avatar"
 import ReactionPicker from "./reaction-picker"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -182,6 +182,138 @@ const Message = memo(
 
 Message.displayName = "Message"
 
+// Memoized chat header component to prevent re-renders
+const ChatHeader = memo(
+  ({
+    isGroup,
+    groupInfo,
+    groupImage,
+    otherUser,
+    otherUserOnlineStatus,
+    formatLastActive,
+    isMobile,
+    onBack,
+  }: {
+    isGroup: boolean
+    groupInfo: any
+    groupImage: string | null
+    otherUser: any
+    otherUserOnlineStatus: { isOnline: boolean; lastActive: Date | null }
+    formatLastActive: (date: Date | null) => string
+    isMobile: boolean
+    onBack?: () => void
+  }) => {
+    return (
+      <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            {isMobile && onBack && (
+              <Button variant="ghost" size="sm" onClick={onBack} className="mr-2 flex items-center">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            )}
+
+            {isGroup ? (
+              <div className="flex items-center">
+                <MemoizedAvatar
+                  src={groupImage}
+                  fallback={<Users className="h-5 w-5 text-gray-400" />}
+                  alt={groupInfo?.name || "Group Chat"}
+                  isGroup={true}
+                />
+                <div className="ml-3">
+                  <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
+                  {groupInfo?.description && (
+                    <div className="text-sm text-gray-500 flex items-center">
+                      <Info className="h-3 w-3 mr-1" />
+                      <span className="truncate max-w-[200px]">{groupInfo.description}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <MemoizedAvatar
+                  src={otherUser?.profileImage}
+                  fallback={otherUser?.username?.charAt(0).toUpperCase() || "U"}
+                  alt={otherUser?.username || "User"}
+                />
+                <div className="ml-3">
+                  <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
+                  <div className="text-xs text-gray-500 flex items-center">
+                    {otherUserOnlineStatus.isOnline ? (
+                      <span className="flex items-center text-green-600">
+                        <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
+                        Online
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {otherUserOnlineStatus.lastActive
+                          ? `Last active ${formatLastActive(otherUserOnlineStatus.lastActive)}`
+                          : "Offline"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chat actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isGroup ? (
+                <DropdownMenuItem className="text-red-600">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Leave Group
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Chat
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    )
+  },
+  // Custom comparison function to prevent unnecessary re-renders
+  (prevProps, nextProps) => {
+    // For group chats
+    if (prevProps.isGroup && nextProps.isGroup) {
+      return (
+        prevProps.groupInfo?.name === nextProps.groupInfo?.name &&
+        prevProps.groupInfo?.description === nextProps.groupInfo?.description &&
+        prevProps.groupImage === nextProps.groupImage
+      )
+    }
+
+    // For direct chats
+    if (!prevProps.isGroup && !nextProps.isGroup) {
+      return (
+        prevProps.otherUser?.username === nextProps.otherUser?.username &&
+        prevProps.otherUser?.profileImage === nextProps.otherUser?.profileImage &&
+        prevProps.otherUserOnlineStatus.isOnline === nextProps.otherUserOnlineStatus.isOnline &&
+        prevProps.otherUserOnlineStatus.lastActive?.getTime() === nextProps.otherUserOnlineStatus.lastActive?.getTime()
+      )
+    }
+
+    // If isGroup changed, we need to re-render
+    return false
+  },
+)
+
+ChatHeader.displayName = "ChatHeader"
+
 export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -220,14 +352,20 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     isOnline: false,
     lastActive: null,
   })
+
+  // Refs for caching and preventing unnecessary re-renders
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const onlineStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastMessageCountRef = useRef(0)
-  const isMobile = useMobile()
   const lastMessagesJsonRef = useRef<string>("")
+  const otherUserRef = useRef<any>(null)
+  const groupInfoRef = useRef<any>(null)
+  const groupImageRef = useRef<string | null>(null)
+  const isMobile = useMobile()
+  const initialFetchDoneRef = useRef(false)
 
   // Process messages to ensure consistent styling
   const processMessages = useCallback(
@@ -247,95 +385,122 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     [userId],
   )
 
-  useEffect(() => {
-    async function fetchMessages() {
-      try {
-        const data = await getChatMessages({ userId, chatId })
+  // Format last active time - memoized to prevent unnecessary re-renders
+  const formatLastActive = useCallback((date: Date | null) => {
+    if (!date) return "Unknown"
+    return formatDistanceToNow(date, { addSuffix: true })
+  }, [])
 
-        if (data.messages && Array.isArray(data.messages)) {
-          // Process messages to ensure consistent styling
-          const processedMessages = processMessages(data.messages)
+  // Fetch messages and chat info
+  const fetchMessages = useCallback(async () => {
+    try {
+      const data = await getChatMessages({ userId, chatId })
 
-          // Convert to JSON for comparison
-          const messagesJson = JSON.stringify(processedMessages)
+      if (data.messages && Array.isArray(data.messages)) {
+        // Process messages to ensure consistent styling
+        const processedMessages = processMessages(data.messages)
 
-          // Only update state if messages have actually changed
-          // This prevents unnecessary re-renders
-          if (messagesJson !== lastMessagesJsonRef.current) {
-            lastMessagesJsonRef.current = messagesJson
+        // Convert to JSON for comparison
+        const messagesJson = JSON.stringify(processedMessages)
 
-            // Only auto-scroll if new messages have been added
-            const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
+        // Only update state if messages have actually changed
+        // This prevents unnecessary re-renders
+        if (messagesJson !== lastMessagesJsonRef.current) {
+          lastMessagesJsonRef.current = messagesJson
 
-            setMessages(processedMessages)
+          // Only auto-scroll if new messages have been added
+          const shouldAutoScroll = autoScroll && data.messages.length > lastMessageCountRef.current
 
-            // Always scroll to bottom on initial load
-            if (loading) {
-              setTimeout(() => {
-                scrollToBottom(false)
-              }, 100)
-            }
-            lastMessageCountRef.current = data.messages.length
+          setMessages(processedMessages)
 
-            // If we should auto-scroll, do it after the state update
-            if (shouldAutoScroll) {
-              setTimeout(() => {
-                scrollToBottom(false)
-              }, 100)
-            }
+          // Always scroll to bottom on initial load
+          if (loading) {
+            setTimeout(() => {
+              scrollToBottom(false)
+            }, 100)
+          }
+          lastMessageCountRef.current = data.messages.length
+
+          // If we should auto-scroll, do it after the state update
+          if (shouldAutoScroll) {
+            setTimeout(() => {
+              scrollToBottom(false)
+            }, 100)
           }
         }
-
-        // Set group info if it's a group chat
-        if (data.isGroup) {
-          setIsGroup(true)
-          setGroupInfo({
-            name: data.name,
-            description: data.description,
-            admins: data.admins,
-          })
-          setParticipants(data.participants || [])
-
-          // Set group image if available
-          if (data.groupImage) {
-            setGroupImage(data.groupImage)
-          }
-
-          // Check if the current user is a member of the group
-          // Fix the type error by ensuring we always set a boolean value
-          const isMember = data.participants ? data.participants.some((p: any) => p._id === userId) : false
-          setIsGroupMember(isMember)
-
-          // Check if the current user is an admin
-          setIsGroupAdmin(data.isAdmin || false)
-        } else {
-          setIsGroup(false)
-          setOtherUser(data.otherUser)
-          setIsGroupMember(true) // Always a member in direct chats
-          setIsGroupAdmin(false)
-
-          // If it's a direct chat, fetch the other user's online status
-          if (data.otherUser && data.otherUser._id) {
-            fetchOtherUserOnlineStatus(data.otherUser._id)
-          }
-        }
-
-        setChatInitialized(true)
-
-        // Mark messages as read
-        if (data.messages && data.messages.some((m: any) => !m.read && m.sender !== userId)) {
-          await markMessagesAsRead({ userId, chatId })
-        }
-      } catch (error) {
-        console.error("Error fetching messages:", error)
-        // Even if there's an error, we should still set chatInitialized to true
-        // so the UI doesn't get stuck in a loading state
-        setChatInitialized(true)
-      } finally {
-        setLoading(false)
       }
-    }
 
+      // Set group info if it's a group chat
+      if (data.isGroup) {
+        setIsGroup(true)
+
+        // Only update group info if it has changed
+        const newGroupInfo = {
+          name: data.name,
+          description: data.description,
+          admins: data.admins,
+        }
+
+        // Use JSON.stringify for deep comparison
+        if (JSON.stringify(newGroupInfo) !== JSON.stringify(groupInfoRef.current)) {
+          groupInfoRef.current = newGroupInfo
+          setGroupInfo(newGroupInfo)
+        }
+
+        // Set participants
+        setParticipants(data.participants || [])
+
+        // Set group image if available and changed
+        if (data.groupImage && data.groupImage !== groupImageRef.current) {
+          groupImageRef.current = data.groupImage
+          setGroupImage(data.groupImage)
+        }
+
+        // Check if the current user is a member of the group
+        const isMember = data.participants ? data.participants.some((p: any) => p._id === userId) : false
+        setIsGroupMember(isMember)
+
+        // Check if the current user is an admin
+        setIsGroupAdmin(data.isAdmin || false)
+      } else {
+        setIsGroup(false)
+
+        // Only update other user if it has changed
+        if (JSON.stringify(data.otherUser) !== JSON.stringify(otherUserRef.current)) {
+          otherUserRef.current = data.otherUser
+          setOtherUser(data.otherUser)
+        }
+
+        setIsGroupMember(true) // Always a member in direct chats
+        setIsGroupAdmin(false)
+
+        // If it's a direct chat, fetch the other user's online status
+        if (data.otherUser && data.otherUser._id) {
+          fetchOtherUserOnlineStatus(data.otherUser._id)
+        }
+      }
+
+      setChatInitialized(true)
+      initialFetchDoneRef.current = true
+
+      // Mark messages as read
+      if (data.messages && data.messages.some((m: any) => !m.read && m.sender !== userId)) {
+        await markMessagesAsRead({ userId, chatId })
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error)
+      // Even if there's an error, we should still set chatInitialized to true
+      // so the UI doesn't get stuck in a loading state
+      setChatInitialized(true)
+      initialFetchDoneRef.current = true
+    } finally {
+      setLoading(false)
+    }
+  }, [userId, chatId, autoScroll, loading, processMessages])
+
+  // Initial fetch and polling setup
+  useEffect(() => {
+    // Initial fetch
     fetchMessages()
 
     // Set up polling to refresh messages every 3 seconds
@@ -350,7 +515,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         clearInterval(onlineStatusIntervalRef.current)
       }
     }
-  }, [userId, chatId, autoScroll, loading, processMessages])
+  }, [fetchMessages])
 
   // Fetch other user's online status
   const fetchOtherUserOnlineStatus = async (otherUserId: string) => {
@@ -484,15 +649,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
         setMessages((prev) => prev.filter((m) => m._id !== optimisticMessage._id))
       } else {
         // Fetch messages again to update the list with the actual message
-        const data = await getChatMessages({ userId, chatId })
-        if (data.messages && Array.isArray(data.messages)) {
-          // Process messages to ensure consistent styling
-          const processedMessages = processMessages(data.messages)
-          setMessages(processedMessages)
-          lastMessageCountRef.current = data.messages.length
-          // Update the JSON reference to prevent unnecessary re-renders
-          lastMessagesJsonRef.current = JSON.stringify(processedMessages)
-        }
+        await fetchMessages()
       }
     } catch (error) {
       console.error("Error sending message:", error)
@@ -514,10 +671,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       if (result.success) {
         setIsGroupMember(true)
         // Refresh messages to update participants list
-        const data = await getChatMessages({ userId, chatId })
-        if (data.participants) {
-          setParticipants(data.participants)
-        }
+        await fetchMessages()
       } else {
         console.error("Failed to join group:", result.error)
       }
@@ -581,12 +735,6 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
       const fakeEvent = { preventDefault: () => {} } as React.FormEvent
       handleSendMessage(fakeEvent)
     }, 300)
-  }
-
-  // Format last active time
-  const formatLastActive = (date: Date | null) => {
-    if (!date) return "Unknown"
-    return formatDistanceToNow(date, { addSuffix: true })
   }
 
   // Handle opening the reaction picker
@@ -697,7 +845,22 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
     return Object.values(groups)
   }, [])
 
-  if (loading) {
+  // Memoized chat header props to prevent unnecessary re-renders
+  const chatHeaderProps = useMemo(() => {
+    return {
+      isGroup,
+      groupInfo,
+      groupImage,
+      otherUser,
+      otherUserOnlineStatus,
+      formatLastActive,
+      isMobile,
+      onBack,
+    }
+  }, [isGroup, groupInfo, groupImage, otherUser, otherUserOnlineStatus, formatLastActive, isMobile, onBack])
+
+  // Show loading state only on initial load
+  if (loading && !initialFetchDoneRef.current) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
@@ -709,105 +872,7 @@ export default function ChatArea({ userId, chatId, onBack }: ChatAreaProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Chat header - Sticky */}
-      <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            {isMobile && onBack && (
-              <Button variant="ghost" size="sm" onClick={onBack} className="mr-2 flex items-center">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            )}
-
-            {isGroup ? (
-              <div className="flex items-center">
-                <Avatar className="h-10 w-10 mr-3 rounded-full">
-                  {groupImage ? (
-                    <AvatarImage
-                      src={groupImage || "/placeholder.svg"}
-                      alt={groupInfo?.name || "Group Chat"}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <AvatarFallback className="rounded-full">
-                      <Users className="h-5 w-5 text-gray-400" />
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div>
-                  <h3 className="font-medium">{groupInfo?.name || "Group Chat"}</h3>
-                  {groupInfo?.description && (
-                    <div className="text-sm text-gray-500 flex items-center">
-                      <Info className="h-3 w-3 mr-1" />
-                      <span className="truncate max-w-[200px]">{groupInfo.description}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <Avatar className="h-10 w-10 mr-3 rounded-full">
-                  {otherUser?.profileImage ? (
-                    <AvatarImage
-                      src={otherUser.profileImage || "/placeholder.svg"}
-                      alt={otherUser?.username || "User"}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <AvatarFallback className="rounded-full">
-                      {otherUser?.username?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div>
-                  <h3 className="font-medium">{otherUser?.username || "New Chat"}</h3>
-                  <div className="text-xs text-gray-500 flex items-center">
-                    {otherUserOnlineStatus.isOnline ? (
-                      <span className="flex items-center text-green-600">
-                        <span className="h-2 w-2 bg-green-500 rounded-full mr-1"></span>
-                        Online
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {otherUserOnlineStatus.lastActive
-                          ? `Last active ${formatLastActive(otherUserOnlineStatus.lastActive)}`
-                          : "Offline"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Chat actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {isGroup ? (
-                <>
-                  {isGroupMember && (
-                    <DropdownMenuItem onClick={() => setShowLeaveDialog(true)} className="text-red-600">
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Leave Group
-                    </DropdownMenuItem>
-                  )}
-                </>
-              ) : (
-                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-600">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Chat
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <ChatHeader {...chatHeaderProps} />
 
       {/* Messages area - Increase padding-top to prevent messages from being hidden under the header */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 pt-10 bg-gray-50 relative">
