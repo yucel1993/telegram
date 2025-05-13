@@ -272,7 +272,7 @@ export default function ChatInterface({ userId, username }: ChatInterfaceProps) 
                   </Button>
                   <Button variant="outline" className="flex-1" onClick={handleLanguageBuddiesClick}>
                     <Globe className="h-4 w-4 mr-2" />
-                    Language Buddies
+                    Language Buddy
                   </Button>
                 </div>
               </>
